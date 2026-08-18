@@ -4,7 +4,7 @@
 # selected model's overrides are deep-merged on top. Launch parameter channel
 # has highest priority.
 
-default_model: dm
+default_model: rs
 
 models:
   dm:

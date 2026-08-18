@@ -26,6 +26,7 @@ setup(
             "rs_scene_camera = rebotarm_mujoco_rs.scene_camera:main",
             "rs_scene_detector = rebotarm_mujoco_rs.scene_detector:main",
             "rs_task_server = rebotarm_mujoco_rs.task_server:main",
+            "joint_slider_gui = rebotarm_mujoco_rs.joint_slider_gui:main",
         ],
     },
 )

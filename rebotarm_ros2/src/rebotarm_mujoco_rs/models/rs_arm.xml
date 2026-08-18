@@ -51,7 +51,7 @@
         <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="rs_anodized_silver_mat" type="mesh" mesh="link1" />
         <geom pos="0 0 0" rgba="0 0 0 0" group="3" contype="1" conaffinity="1" type="mesh" mesh="link1" />
         <body name="link2" pos="0.020343 0.027237 0.07" quat="0.7071055 -0.7071081 0 0">
-          <joint name="joint2" type="hinge" axis="0 0 1" limited="true" range="0 3.14" damping="0.5" frictionloss="0"/>
+          <joint name="joint2" type="hinge" axis="0 0 1" limited="true" range="-0.2 3.14" damping="0.5" frictionloss="0"/>
           <inertial pos="-0.1178648 -0.0034223 -0.0271552" mass="1.772" fullinertia="0.00073374 0.01255987 0.01281387 -0.00000043 0.00000851 0.00000128"/>
           <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="rs_motor_black_mat" type="mesh" mesh="motor_2_3" />
           <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="rs_anodized_silver_mat" type="mesh" mesh="cnc2" />
@@ -59,7 +59,7 @@
           <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="rs_seeed_green_mat" type="mesh" mesh="pla2_green" />
           <geom pos="0 0 0" rgba="0 0 0 0" group="3" contype="1" conaffinity="1" type="mesh" mesh="link2" />
           <body name="link3" pos="-0.236 0 0">
-            <joint name="joint3" type="hinge" axis="0 0 -1" limited="true" range="0 3.14" damping="0.5" frictionloss="0"/>
+            <joint name="joint3" type="hinge" axis="0 0 -1" limited="true" range="-0.2 3.14" damping="0.5" frictionloss="0"/>
             <inertial pos="0.1034272 -0.0664138 -0.0271069" mass="1.062" fullinertia="0.00046807 0.00632695 0.00648221 -0.00003456 -0.0000426 0.00000006"/>
             <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="rs_anodized_silver_mat" type="mesh" mesh="cnc3" />
             <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="rs_motor_black_mat" type="mesh" mesh="motor_4" />
@@ -92,6 +92,7 @@
                     <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="rs_anodized_silver_mat" type="mesh" mesh="cnc7" />
                     <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="rs_motor_black_mat" type="mesh" mesh="motor_7" />
                     <geom pos="0 0 0" rgba="0 0 0 0" group="3" contype="1" conaffinity="1" type="mesh" mesh="gripper_end" />
+                    <site name="tcp" pos="0 0 0" size="0.01" rgba="1 0 0 0.3" group="2"/>
                     <!-- 夹爪驱动关节：通过 equality 与 joint_left / joint_right 联动。
                          axis="0 1 0" 沿 gripper_end 局部 -Y，即世界 Y 负方向，
                          因此 joint7 增大时 left 向 -Y、right 向 +Y 张开。 -->

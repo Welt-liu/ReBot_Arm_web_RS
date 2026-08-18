@@ -4,6 +4,26 @@
      For more information, please see http://wiki.ros.org/sw_urdf_exporter -->
 <robot
   name="00-arm-rs_asm-v3">
+  <!-- Shared finish palette. Keep these names aligned with the Web and MJCF
+       material maps so RViz, Three.js and MuJoCo render the same RS colours. -->
+  <material name="rs_base_black">
+    <color rgba="0.055 0.065 0.060 1" />
+  </material>
+  <material name="rs_motor_black">
+    <color rgba="0.045 0.052 0.049 1" />
+  </material>
+  <material name="rs_pla_black">
+    <color rgba="0.090 0.106 0.102 1" />
+  </material>
+  <material name="rs_wordmark_black">
+    <color rgba="0.010 0.012 0.011 1" />
+  </material>
+  <material name="rs_anodized_silver">
+    <color rgba="0.720 0.760 0.730 1" />
+  </material>
+  <material name="rs_seeed_green">
+    <color rgba="0.725 0.835 0.118 1" />
+  </material>
   <link
     name="base_link">
     <inertial>
@@ -26,13 +46,9 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/base_link.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/base_link.STL" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
-      </material>
+      <material name="rs_base_black" />
     </visual>
     <collision>
       <origin
@@ -40,7 +56,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/base_link.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/base_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -66,13 +82,9 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/link1.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/link1.STL" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
-      </material>
+      <material name="rs_anodized_silver" />
     </visual>
     <collision>
       <origin
@@ -80,7 +92,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/link1.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/link1.STL" />
       </geometry>
     </collision>
   </link>
@@ -109,7 +121,7 @@
         xyz="-0.117864812717456 -0.00342226413942967 -0.0271551938501484"
         rpy="0 0 0" />
       <mass
-        value="1.552" />
+        value="1.972" />
       <inertia
         ixx="0.00073374"
         ixy="-0.00000043"
@@ -124,13 +136,9 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/link2.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/link2.STL" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
-      </material>
+      <material name="rs_motor_black" />
     </visual> -->
     <visual>
       <origin
@@ -138,13 +146,9 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/motor_2_3.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/motor_2_3.STL" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
-      </material>
+      <material name="rs_motor_black" />
     </visual>
     <visual>
       <origin
@@ -152,13 +156,9 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/cnc2.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/cnc2.STL" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
-      </material>
+      <material name="rs_anodized_silver" />
     </visual>
     <visual>
       <origin
@@ -166,13 +166,9 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/pla2_black.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/pla2_black.STL" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
-      </material>
+      <material name="rs_pla_black" />
     </visual>
     <visual>
       <origin
@@ -180,13 +176,9 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/pla2_green.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/pla2_green.STL" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
-      </material>
+      <material name="rs_seeed_green" />
     </visual>
     <collision>
       <origin
@@ -194,7 +186,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/link2.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/link2.STL" />
       </geometry>
     </collision>
   </link>
@@ -223,7 +215,7 @@
         xyz="0.103427154487799 -0.0664137912104635 -0.0271068687716704"
         rpy="0 0 0" />
       <mass
-        value="1.252" />
+        value="1.062" />
       <inertia
         ixx="0.00046807"
         ixy="-0.00003456"
@@ -238,13 +230,9 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/link3.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/link3.STL" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
-      </material>
+      <material name="rs_motor_black" />
     </visual> -->
     <visual>
       <origin
@@ -252,13 +240,9 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/cnc3.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/cnc3.STL" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
-      </material>
+      <material name="rs_anodized_silver" />
     </visual>
     <visual>
       <origin
@@ -266,13 +250,9 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/motor_4.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/motor_4.STL" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
-      </material>
+      <material name="rs_motor_black" />
     </visual>
     <visual>
       <origin
@@ -280,13 +260,9 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/pla3_black.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/pla3_black_without_seeed_badge.STL" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
-      </material>
+      <material name="rs_pla_black" />
     </visual>
     <visual>
       <origin
@@ -294,13 +270,29 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/pla3_green.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/pla3_seeed_badge_with_counters.STL" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
-      </material>
+      <material name="rs_seeed_green" />
+    </visual>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://rebotarm_bringup/description/meshes_rs/pla3_seeed_wordmark_backing.STL" />
+      </geometry>
+      <material name="rs_wordmark_black" />
+    </visual>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://rebotarm_bringup/description/meshes_rs/pla3_green.STL" />
+      </geometry>
+      <material name="rs_seeed_green" />
     </visual>
     <collision>
       <origin
@@ -308,7 +300,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/link3.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/link3.STL" />
       </geometry>
     </collision>
   </link>
@@ -337,7 +329,7 @@
         xyz="0.0475544540775559 -0.0441113470158517 -0.0314111924918381"
         rpy="0 0 0" />
       <mass
-        value="0.46" />
+        value="0.66" />
       <inertia
         ixx="0.00045986"
         ixy="0.00024219"
@@ -352,13 +344,9 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/link4.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/link4.STL" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
-      </material>
+      <material name="rs_motor_black" />
     </visual> -->
     <visual>
       <origin
@@ -366,13 +354,9 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/motor_5.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/motor_5.STL" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
-      </material>
+      <material name="rs_motor_black" />
     </visual>
     <visual>
       <origin
@@ -380,13 +364,9 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/cnc4.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/cnc4.STL" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
-      </material>
+      <material name="rs_anodized_silver" />
     </visual>
     <collision>
       <origin
@@ -394,7 +374,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/link4.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/link4.STL" />
       </geometry>
     </collision>
   </link>
@@ -423,7 +403,7 @@
         xyz="0.0114400622356175 4.7907739316217E-06 0.0380487481818926"
         rpy="0 0 0" />
       <mass
-        value="0.20120457182895" />
+        value="0.150120457182895" />
       <inertia
         ixx="7.34238025911107E-05"
         ixy="1.35700947009798E-08"
@@ -438,13 +418,9 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/link5.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/link5.STL" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
-      </material>
+      <material name="rs_motor_black" />
     </visual> -->
     <visual>
       <origin
@@ -452,13 +428,9 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/motor_6.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/motor_6.STL" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
-      </material>
+      <material name="rs_motor_black" />
     </visual>
     <visual>
       <origin
@@ -466,13 +438,9 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/cnc5.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/cnc5.STL" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
-      </material>
+      <material name="rs_anodized_silver" />
     </visual>
     <visual>
       <origin
@@ -480,13 +448,9 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/pla5_green.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/pla5_green.STL" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
-      </material>
+      <material name="rs_seeed_green" />
     </visual>
     <collision>
       <origin
@@ -494,7 +458,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/link5.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/link5.STL" />
       </geometry>
     </collision>
   </link>
@@ -523,7 +487,7 @@
         xyz="1.80196022567525E-05 2.48334592051007E-08 0.00434805764057547"
         rpy="0 0 0" />
       <mass
-        value="0.1" />
+        value="0.03" />
       <inertia
         ixx="4.42273835852359E-06"
         ixy="3.16758463739482E-12"
@@ -538,13 +502,9 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/link6.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/link6.STL" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
-      </material>
+      <material name="rs_motor_black" />
     </visual>
     <collision>
       <origin
@@ -552,7 +512,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/link6.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/link6.STL" />
       </geometry>
     </collision>
   </link>
@@ -596,13 +556,9 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/gripper_end.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/gripper_end.STL" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
-      </material>
+      <material name="rs_anodized_silver" />
     </visual> -->
     <visual>
       <origin
@@ -610,13 +566,9 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/pla7_green.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/pla7_green.STL" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
-      </material>
+      <material name="rs_seeed_green" />
     </visual>
     <visual>
       <origin
@@ -624,13 +576,9 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/cnc7.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/cnc7.STL" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
-      </material>
+      <material name="rs_anodized_silver" />
     </visual>
     <visual>
       <origin
@@ -638,13 +586,9 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/motor_7.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/motor_7.STL" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
-      </material>
+      <material name="rs_motor_black" />
     </visual>
     <collision>
       <origin
@@ -652,7 +596,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/gripper_end.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/gripper_end.STL" />
       </geometry>
     </collision>
   </link>
@@ -691,7 +635,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/gripper_left.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/gripper_left.STL" />
       </geometry>
       <material
         name="">
@@ -705,13 +649,9 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/pla_left.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/pla_left.STL" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
-      </material>
+      <material name="rs_pla_black" />
     </visual>
     <visual>
       <origin
@@ -719,13 +659,9 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/cnc_left.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/cnc_left.STL" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
-      </material>
+      <material name="rs_anodized_silver" />
     </visual>
     <collision>
       <origin
@@ -733,12 +669,12 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/gripper_left.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/gripper_left.STL" />
       </geometry>
     </collision>
   </link>
   <joint
-    name="joint_left"
+    name="gripper_joint1"
     type="prismatic">
     <origin
       xyz="-0.041939 -7.3385E-05 0"
@@ -777,7 +713,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/gripper_right.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/gripper_right.STL" />
       </geometry>
       <material
         name="">
@@ -791,13 +727,9 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/pla_right.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/pla_right.STL" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
-      </material>
+      <material name="rs_pla_black" />
     </visual>
     <visual>
       <origin
@@ -805,13 +737,9 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/cnc_right.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/cnc_right.STL" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
-      </material>
+      <material name="rs_anodized_silver" />
     </visual>
     <collision>
       <origin
@@ -819,12 +747,12 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/gripper_right.STL" />
+          filename="package://rebotarm_bringup/description/meshes_rs/gripper_right.STL" />
       </geometry>
     </collision>
   </link>
   <joint
-    name="joint_right"
+    name="gripper_joint2"
     type="prismatic">
     <origin
       xyz="-0.041939 7.3385E-05 0"

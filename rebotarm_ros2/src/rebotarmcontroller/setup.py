@@ -24,7 +24,8 @@ setup(
             "GravityCompensation = rebotarmcontroller.examples.gravity_compensation:main",
             "GripperControl = rebotarmcontroller.examples.gripper_control:main",
             "MoveTo = rebotarmcontroller.examples.move_to:main",
-            "MoveToPose = rebotarmcontroller.examples.move_to_pose:main",
-        ],
+           "MoveToPose = rebotarmcontroller.examples.move_to_pose:main",
+            "CancelAction = rebotarmcontroller.examples.cancel_action:main",
+       ],
     },
 )
