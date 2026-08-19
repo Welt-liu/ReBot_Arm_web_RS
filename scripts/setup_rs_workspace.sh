@@ -3,7 +3,18 @@
 set -euo pipefail
 
 REBOTARM_RS_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REBOTARM_ROS_DISTRO="${ROS_DISTRO:-jazzy}"
+if [[ -n "${ROS_DISTRO:-}" ]]; then
+  REBOTARM_ROS_DISTRO="${ROS_DISTRO}"
+elif [[ -r /etc/os-release ]]; then
+  # shellcheck source=/dev/null
+  source /etc/os-release
+  case "${ID:-}:${VERSION_ID:-}" in
+    ubuntu:22.04) REBOTARM_ROS_DISTRO=humble ;;
+    *) REBOTARM_ROS_DISTRO=jazzy ;;
+  esac
+else
+  REBOTARM_ROS_DISTRO=jazzy
+fi
 REBOTARM_ROS_SETUP="/opt/ros/${REBOTARM_ROS_DISTRO}/setup.bash"
 REBOTARM_WS="${REBOTARM_RS_ROOT}/rebotarm_ros2"
 REBOTARM_VENV="${REBOTARM_WS}/.venv"

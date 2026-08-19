@@ -92,6 +92,7 @@ fi
 
 log 'Checking supported platform'
 PY_SITE=''
+NEED_NODESOURCE=0
 if [[ -r /etc/os-release ]]; then
   # shellcheck source=/dev/null
   source /etc/os-release
@@ -104,6 +105,7 @@ if [[ -r /etc/os-release ]]; then
     ubuntu:22.04)
       DETECTED_ROS_DISTRO=humble
       PY_SITE=python3.10
+      NEED_NODESOURCE=1
       record_skipped "Ubuntu ${VERSION_ID} supported"
       ;;
     *)
@@ -131,7 +133,6 @@ esac
 APT_PACKAGES=(
   git curl ca-certificates software-properties-common build-essential pkg-config
   python3 python3-venv python3-pip python3-pytest
-  nodejs npm
   iproute2 can-utils util-linux
   libgl1 libegl1 libx11-6 libxrandr2 libxinerama1 libxcursor1 libxi6
   ros-dev-tools
@@ -140,6 +141,12 @@ APT_PACKAGES=(
   ros-${ROS_DISTRO}-moveit
   ros-${ROS_DISTRO}-tf-transformations
 )
+# On 22.04 the default nodejs is 12.x (too old for this project);
+# Node.js 22 LTS is installed separately from NodeSource below.
+# On 24.04 the default apt nodejs is 18+ and npm is a separate package.
+if [[ "${NEED_NODESOURCE:-0}" != "1" ]]; then
+  APT_PACKAGES+=(nodejs npm)
+fi
 
 apt_capability_available() {
   case "$1" in
@@ -226,11 +233,30 @@ if have node; then
   node_major="${node_version%%.*}"
   if ((node_major >= 18)); then
     record_skipped "Node.js ${node_version} compatible"
+  elif ((CHECK_ONLY)); then
+    record_mismatch "Node.js >=18 required; found ${node_version}"
+  elif [[ "${NEED_NODESOURCE:-0}" == "1" ]]; then
+    log "Upgrading Node.js from ${node_version} to 22 LTS via NodeSource"
+    have curl || run_sudo apt-get install -y curl ca-certificates
+    curl -fsSL "https://deb.nodesource.com/setup_22.x" | run_sudo -E bash -
+    run_sudo apt-get install -y nodejs
+    node_version="$(node -p 'process.versions.node' 2>/dev/null || printf unknown)"
+    record_installed "NodeSource Node.js ${node_version}"
   else
     record_mismatch "Node.js >=18 required; found ${node_version}"
   fi
 else
-  record_failed 'node command missing'
+  if ((CHECK_ONLY)); then
+    record_failed 'node command missing'
+  elif [[ "${NEED_NODESOURCE:-0}" == "1" ]]; then
+    log 'Installing Node.js 22 LTS via NodeSource'
+    have curl || run_sudo apt-get install -y curl ca-certificates
+    curl -fsSL "https://deb.nodesource.com/setup_22.x" | run_sudo -E bash -
+    run_sudo apt-get install -y nodejs
+    record_installed 'NodeSource Node.js 22 LTS'
+  else
+    record_failed 'node command missing'
+  fi
 fi
 
 log 'Checking integrated RS sources and model assets'
