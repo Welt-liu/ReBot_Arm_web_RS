@@ -30,19 +30,19 @@ const PORT = Number(process.env.PORT || (USE_HTTPS ? 3444 : 3002));
 const ROOT = __dirname;
 const PUBLIC_DIR = path.join(ROOT, 'public');
 const BRINGUP_DIR = path.resolve(
-  path.join(ROOT, '..', 'rebotarm_ros2', 'src', 'rebotarm_bringup')
+  path.join(ROOT, '..', 'rebotarm_ros2_RS', 'src', 'rebotarm_bringup')
 );
 const ROBOT_VARIANT = 'b601_rs';
 const ROS_URDF_FILE = path.join(
   BRINGUP_DIR,
   'description',
   'urdf',
-  '00-arm-rs_asm-v3.urdf'
+  'ReBot_Arm_RS.urdf'
 );
 const ROS_MESHES_DIR = path.join(BRINGUP_DIR, 'description', 'meshes_rs');
 const URDF_FILE = fs.existsSync(ROS_URDF_FILE)
   ? ROS_URDF_FILE
-  : path.join(ROOT, 'description', 'urdf', '00-arm-rs_asm-v3.urdf');
+  : path.join(ROOT, 'description', 'urdf', 'ReBot_Arm_RS.urdf');
 const MESHES_DIR = fs.existsSync(ROS_MESHES_DIR)
   ? ROS_MESHES_DIR
   : path.join(ROOT, 'description', 'meshes_rs');
@@ -398,7 +398,7 @@ server.listen(PORT, () => {
   console.log(`  Local: ${protocol}://localhost:${PORT}`);
   lanAddresses.forEach((address) => console.log(`  LAN:   ${protocol}://${address}:${PORT}`));
   console.log(`  URDF:  ${protocol}://localhost:${PORT}/api/urdf`);
-  console.log(`  Mesh:  ${protocol}://localhost:${PORT}/api/description/meshes/base_link.STL`);
+  console.log(`  Mesh:  ${protocol}://localhost:${PORT}/api/description/meshes_rs/base_link.STL`);
   console.log(`  Gripper meshes: ${GRIPPER_MESHES_DIR}`);
   console.log('----------------------------------------');
   console.log(`  URDF file: ${URDF_FILE}`);

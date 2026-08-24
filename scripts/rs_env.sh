@@ -16,8 +16,8 @@ else
   REBOTARM_ROS_DISTRO=jazzy
 fi
 REBOTARM_ROS_SETUP="/opt/ros/${REBOTARM_ROS_DISTRO}/setup.bash"
-REBOTARM_WS_SETUP="${REBOTARM_RS_ROOT}/rebotarm_ros2/install/setup.bash"
-REBOTARM_VENV_ACTIVATE="${REBOTARM_RS_ROOT}/rebotarm_ros2/.venv/bin/activate"
+REBOTARM_WS_SETUP="${REBOTARM_RS_ROOT}/rebotarm_ros2_RS/install/setup.bash"
+REBOTARM_VENV_ACTIVATE="${REBOTARM_RS_ROOT}/rebotarm_ros2_RS/.venv/bin/activate"
 
 if [[ ! -f "${REBOTARM_ROS_SETUP}" ]]; then
   echo "ROS 2 environment not found: ${REBOTARM_ROS_SETUP}" >&2

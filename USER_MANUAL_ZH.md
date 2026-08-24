@@ -56,7 +56,7 @@ cd /home/robot/reBot_Arm_Mujoco-RS
 ./rebotarm doctor
 ```
 
-安装脚本不会覆盖已有 `.env`，也不会重新下载或重置 `rebotarm_ros2/third_party`。如果只需
+安装脚本不会覆盖已有 `.env`，也不会重新下载或重置 `rebotarm_ros2_RS/third_party`。如果只需
 重建 ROS 工作区：
 
 ```bash
@@ -129,7 +129,7 @@ ws://192.168.1.20:9090
 - J1–J6 控制六个机械臂关节；
 - J7/夹爪以开口宽度显示，命令范围约 `0–71.5 mm`；
 - 仿真网页模型由 MuJoCo 实际反馈驱动；
-- 真机模式中实线模型表示测量反馈，半透明模型表示命令目标；
+- 真机模式中实线模型表示测量反馈，半透明模型表示命令目标；目标到位或等待超时后，半透明鬼影会自动隐藏；
 - 网页速度范围为 `0.05–1.50 rad/s`，真机首次使用建议 `0.2–0.4 rad/s`。
 
 ### 6.2 Pose 和 IK
@@ -142,6 +142,7 @@ Pose 输入单位是米：X 向前、Y 向左、Z 向上。输入目标和时长
 - 仿真一般无需手动使能；
 - 真机控制器每次重启后需要重新使能；
 - “安全回零”会平滑返回零位；
+- “从零点执行当前姿态”会先用一段轨迹回到零点，再用第二段轨迹执行到网页当前姿态；默认每段 `2 s`；
 - 非零位失能会先回零并验证，失败时保持使能；
 - 网页按钮不是物理急停，真机必须配备可用急停。
 
@@ -371,13 +372,13 @@ candump can0
 父仓库直接跟踪：
 
 ```text
-rebotarm_ros2/third_party/reBotArm_control_py
-rebotarm_ros2/src/rebotarm_mujoco_rs/models
+rebotarm_ros2_RS/third_party/reBotArm_control_py
+rebotarm_ros2_RS/src/rebotarm_mujoco_rs/models
 ```
 
 SDK 是普通源码目录；MuJoCo 目录只保留主工程实际使用的模型 XML 和 STL 网格。它们不是
-submodule，也没有各自的 `.git`。来源基线分别记录在 `rebotarm_ros2/third_party/README.md`
-和 `rebotarm_ros2/src/rebotarm_mujoco_rs/README.md`。
+submodule，也没有各自的 `.git`。来源基线分别记录在 `rebotarm_ros2_RS/third_party/README.md`
+和 `rebotarm_ros2_RS/src/rebotarm_mujoco_rs/README.md`。
 
 SDK 没有修改设备协议、CAN 通信、MIT 发包或电机参数读写。当前 SDK 本地修改只有 RS
 笛卡尔轨迹安全保护：根据关节空间总行程自动延长过短轨迹，使真机速度不超过约
@@ -391,7 +392,7 @@ SDK 没有修改设备协议、CAN 通信、MIT 发包或电机参数读写。�
 
 ```bash
 source scripts/rs_env.sh
-python3 -m pytest rebotarm_ros2/src/rebotarmcontroller/test -q
+python3 -m pytest rebotarm_ros2_RS/src/rebotarmcontroller/test -q
 
 bash -n setup.sh rebotarm scripts/*.sh
 node --check reBotArm_simulator-RS/server.js

@@ -38,8 +38,8 @@ cd /home/robot/reBot_Arm_Mujoco-RS
 ./rebotarm doctor        # 安装完成后复查
 ```
 
-控制 SDK 已作为普通源码保存在 `rebotarm_ros2/third_party/`；运行所需的 MuJoCo 模型
-XML 与 STL 网格已合入 `rebotarm_ros2/src/rebotarm_mujoco_rs/models/`。它们都不是
+控制 SDK 已作为普通源码保存在 `rebotarm_ros2_RS/third_party/`；运行所需的 MuJoCo 模型
+XML 与 STL 网格已合入 `rebotarm_ros2_RS/src/rebotarm_mujoco_rs/models/`。它们都不是
 submodule 或嵌套 Git 仓库，一次普通 clone 即可取得完整构建输入。来源基线为：
 
 - `vectorBH6/reBotArm_control_py`：`40ab6ce58fec3c58cb603efb3f30240d6f5849e4`
@@ -178,9 +178,9 @@ ROS 工作区构建器；`scripts/start_rs_dual.sh` 仅用于同时启动真机 
 
 ```bash
 source scripts/rs_env.sh
-python3 -m pytest rebotarm_ros2/src/rebotarmcontroller/test -q
+python3 -m pytest rebotarm_ros2_RS/src/rebotarmcontroller/test -q
 
-cd rebotarm_ros2
+cd rebotarm_ros2_RS
 colcon build --symlink-install
 colcon test --packages-select rebotarmcontroller
 colcon test-result --verbose
@@ -197,10 +197,10 @@ node --check reBotArm_simulator-RS/public/js/rebot-sim.js
 
 ## 本地源码维护
 
-`rebotarm_ros2/third_party/` 中的 SDK 和 MuJoCo 源码由本仓库直接跟踪。不要在其中运行
+`rebotarm_ros2_RS/third_party/` 中的 SDK 和 MuJoCo 源码由本仓库直接跟踪。不要在其中运行
 `git init`，也不要再 clone 形成嵌套仓库。更新上游时直接审查普通文件差异并提交到本
 仓库，确保其他用户只需 clone 一次即可得到完整工程。来源基线见
-[`rebotarm_ros2/third_party/README.md`](rebotarm_ros2/third_party/README.md)。
+[`rebotarm_ros2_RS/third_party/README.md`](rebotarm_ros2_RS/third_party/README.md)。
 
 ## 安全与提交约定
 

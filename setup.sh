@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-WS_DIR="${ROOT_DIR}/rebotarm_ros2"
+WS_DIR="${ROOT_DIR}/rebotarm_ros2_RS"
 WEB_DIR="${ROOT_DIR}/reBotArm_simulator-RS"
 VENV_DIR="${WS_DIR}/.venv"
 SDK_DIR="${WS_DIR}/third_party/reBotArm_control_py"
@@ -93,6 +93,10 @@ fi
 log 'Checking supported platform'
 PY_SITE=''
 NEED_NODESOURCE=0
+SYS_PYTHON='/usr/bin/python3'
+if [[ ! -x "${SYS_PYTHON}" ]]; then
+  SYS_PYTHON='python3'
+fi
 if [[ -r /etc/os-release ]]; then
   # shellcheck source=/dev/null
   source /etc/os-release
@@ -110,7 +114,7 @@ if [[ -r /etc/os-release ]]; then
       ;;
     *)
       DETECTED_ROS_DISTRO="${ROS_DISTRO:-jazzy}"
-      PY_SITE="python$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || printf '3')"
+      PY_SITE="python$(${SYS_PYTHON} -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || printf '3')"
       record_mismatch "expected Ubuntu 24.04 or 22.04; found ${PRETTY_NAME:-unknown}"
       ;;
   esac
@@ -190,17 +194,32 @@ if ((${#MISSING_APT[@]})); then
       run_sudo apt-get update || record_mismatch 'apt update reported an error before ROS source setup'
       run_sudo apt-get install -y software-properties-common curl ca-certificates
       run_sudo add-apt-repository -y universe
-      ros_apt_version="$(curl -fsSL https://api.github.com/repos/ros-infrastructure/ros-apt-source/releases/latest | sed -n 's/.*"tag_name": "\([^"]*\)".*/\1/p' | head -n1)"
-      if [[ -z "${ros_apt_version}" ]]; then
-        record_failed 'could not resolve the latest ros2-apt-source version'
-        exit 1
+     ros_apt_version="$(curl -fsSL https://api.github.com/repos/ros-infrastructure/ros-apt-source/releases/latest | sed -n 's/.*"tag_name": "\([^"]*\)".*/\1/p' | head -n1)"
+     if [[ -z "${ros_apt_version}" ]]; then
+       record_failed 'could not resolve the latest ros2-apt-source version'
+       exit 1
+     fi
+     codename="${UBUNTU_CODENAME:-${VERSION_CODENAME:-noble}}"
+     ros_apt_deb="$(mktemp /tmp/ros2-apt-source.XXXXXX.deb)"
+      ros_apt_url="https://github.com/ros-infrastructure/ros-apt-source/releases/download/${ros_apt_version}/ros2-apt-source_${ros_apt_version}.${codename}_all.deb"
+      if curl -fL -o "${ros_apt_deb}" "${ros_apt_url}"; then
+        run_sudo dpkg -i "${ros_apt_deb}"
+        record_installed "official ROS 2 apt source ${ros_apt_version}"
+      else
+        log 'ros-apt-source deb download failed; falling back to keyring-based setup'
+        run_sudo apt-get install -y curl gnupg lsb-release
+        ros_keyring="/usr/share/keyrings/ros-archive-keyring.gpg"
+        if [[ ! -f "${ros_keyring}" ]]; then
+          run_sudo curl -sSL "https://raw.githubusercontent.com/ros/rosdistro/master/ros.key" -o "${ros_keyring}"
+        fi
+        codename="${UBUNTU_CODENAME:-${VERSION_CODENAME:-noble}}"
+        ros_list="/etc/apt/sources.list.d/ros2.list"
+        if [[ ! -f "${ros_list}" ]] || ! grep -q "ros2/ubuntu" "${ros_list}" 2>/dev/null; then
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=${ros_keyring}] http://packages.ros.org/ros2/ubuntu ${codename} main" | \
+            run_sudo tee "${ros_list}" >/dev/null
+          record_installed "ROS 2 apt repository (keyring fallback)"
+        fi
       fi
-      codename="${UBUNTU_CODENAME:-${VERSION_CODENAME:-noble}}"
-      ros_apt_deb="$(mktemp /tmp/ros2-apt-source.XXXXXX.deb)"
-      curl -fL -o "${ros_apt_deb}" \
-        "https://github.com/ros-infrastructure/ros-apt-source/releases/download/${ros_apt_version}/ros2-apt-source_${ros_apt_version}.${codename}_all.deb"
-      run_sudo dpkg -i "${ros_apt_deb}"
-      record_installed "official ROS 2 apt source ${ros_apt_version}"
     fi
     run_sudo apt-get update || record_mismatch 'apt update reported an error; continuing with available indexes'
     if run_sudo apt-get install -y "${MISSING_APT[@]}"; then
@@ -218,8 +237,8 @@ fi
 
 log 'Checking runtime versions'
 if have python3; then
-  py_version="$(python3 -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')"
-  if python3 -c 'import sys; raise SystemExit(0 if sys.version_info[:2] in ((3, 12), (3, 10)) else 1)'; then
+  py_version="$(${SYS_PYTHON} -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')"
+  if ${SYS_PYTHON} -c 'import sys; raise SystemExit(0 if sys.version_info[:2] in ((3, 12), (3, 10)) else 1)'; then
     record_skipped "Python ${py_version} compatible"
   else
     record_mismatch "expected Python 3.12 or 3.10; found ${py_version}"
@@ -272,7 +291,7 @@ else
   record_failed "integrated RS MuJoCo model missing: ${MUJOCO_MODEL_DIR}"
 fi
 if find "${WS_DIR}/third_party" -mindepth 2 -maxdepth 2 -name .git -print -quit | grep -q .; then
-  record_failed 'nested Git metadata exists under rebotarm_ros2/third_party'
+  record_failed 'nested Git metadata exists under rebotarm_ros2_RS/third_party'
 else
   record_skipped 'control SDK is ordinary source in the main repository'
 fi

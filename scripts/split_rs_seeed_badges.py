@@ -277,10 +277,10 @@ def split_mesh(source: Path) -> tuple[Path, Path, Path, int, int, int]:
 def main() -> None:
     project_root = Path(__file__).resolve().parents[1]
     default_mesh_dirs = [
-        project_root / "rebotarm_ros2/src/rebotarm_bringup/description/meshes_rs",
+        project_root / "rebotarm_ros2_RS/src/rebotarm_bringup/description/meshes_rs",
         project_root / "reBotArm_simulator-RS/description/meshes_rs",
         project_root
-        / "rebotarm_ros2/src/rebotarm_mujoco_rs/models/meshes",
+        / "rebotarm_ros2_RS/src/rebotarm_mujoco_rs/models/meshes",
     ]
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(

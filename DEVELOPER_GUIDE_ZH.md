@@ -37,7 +37,7 @@ reBot_Arm_Mujoco-RS/
 │   ├── start_rs_hardware.sh          # 真机独占、安全替换旧实例
 │   ├── start_rs_dual.sh              # 真机/仿真双命名空间开发
 │   └── start_rs_text_agent.sh        # 自然语言 Agent HTTP 服务
-├── rebotarm_ros2/
+├── rebotarm_ros2_RS/
 │   ├── src/rebotarmcontroller/        # 真机驱动、状态机、动作、Fake Driver
 │   ├── src/rebotarm_msgs/             # 自定义 msg/srv/action
 │   ├── src/rebotarm_bringup/          # 配置、URDF、launch、RViz
@@ -65,7 +65,7 @@ cd /home/robot/reBot_Arm_Mujoco-RS
 1. 检查 Ubuntu、Python、Node.js、SocketCAN 工具和 ROS 2；
 2. 缺少 ROS 软件源时安装官方 `ros2-apt-source`；
 3. 安装 ROS desktop、rosbridge、MoveIt、构建工具和 `can-utils`；
-4. 创建 `rebotarm_ros2/.venv`；
+4. 创建 `rebotarm_ros2_RS/.venv`；
 5. 拉取并固定 `reBotArm_control_py` 和 RS MuJoCo 上游提交；
 6. 应用 `patches/` 与 `vendor_overrides/`；
 7. 通过 rosdep 安装包依赖并执行 `colcon build --symlink-install`；
@@ -79,7 +79,7 @@ cd /home/robot/reBot_Arm_Mujoco-RS
 
 `setup_rs_workspace.sh` 是 `setup.sh` 调用的下层构建脚本。它假定 ROS 2 已经安装好，只负责：
 
-- 创建 `rebotarm_ros2/.venv` 并安装 RS 真机、MuJoCo 和 Agent 的 Python 依赖；
+- 创建 `rebotarm_ros2_RS/.venv` 并安装 RS 真机、MuJoCo 和 Agent 的 Python 依赖；
 - 拉取固定版本的 RS 控制 SDK 与 RS MuJoCo 模型；
 - 应用 `patches/` 和 `vendor_overrides/`；
 - 执行 rosdep 和 `colcon build --symlink-install`。
@@ -92,7 +92,7 @@ cd /home/robot/reBot_Arm_Mujoco-RS
 
 ```bash
 source scripts/rs_env.sh
-cd rebotarm_ros2
+cd rebotarm_ros2_RS
 colcon build --symlink-install
 ```
 
@@ -299,7 +299,7 @@ export REBOTARM_LLM_MODEL='qwen-plus'
 
 ### 真机控制
 
-文件：`rebotarm_ros2/src/rebotarm_bringup/config/rebotarm_hardware.yaml`
+文件：`rebotarm_ros2_RS/src/rebotarm_bringup/config/rebotarm_hardware.yaml`
 
 ```yaml
 rate: 125
@@ -334,11 +334,11 @@ gravity_compensation:
 
 ### MuJoCo
 
-- 同步频率与 PD：`rebotarm_ros2/src/rebotarm_mujoco_rs/rebotarm_mujoco_rs/mujoco_sync.py`
-- launch 默认参数：`rebotarm_ros2/src/rebotarm_mujoco_rs/launch/mujoco_rs.launch.py`
-- 任务/回放：`rebotarm_ros2/src/rebotarm_mujoco_rs/rebotarm_mujoco_rs/task_server.py`
-- MuJoCo 模型资源：`rebotarm_ros2/src/rebotarm_mujoco_rs/models/`
-- 控制 SDK 源码：`rebotarm_ros2/third_party/reBotArm_control_py/`
+- 同步频率与 PD：`rebotarm_ros2_RS/src/rebotarm_mujoco_rs/rebotarm_mujoco_rs/mujoco_sync.py`
+- launch 默认参数：`rebotarm_ros2_RS/src/rebotarm_mujoco_rs/launch/mujoco_rs.launch.py`
+- 任务/回放：`rebotarm_ros2_RS/src/rebotarm_mujoco_rs/rebotarm_mujoco_rs/task_server.py`
+- MuJoCo 模型资源：`rebotarm_ros2_RS/src/rebotarm_mujoco_rs/models/`
+- 控制 SDK 源码：`rebotarm_ros2_RS/third_party/reBotArm_control_py/`
 
 这些内容由主仓库直接跟踪，不保留嵌套 `.git`。MuJoCo 只合入实际使用的模型 XML 和 STL，
 不依赖上游算法包。修改 SDK、模型或网格后直接随主仓库提交。

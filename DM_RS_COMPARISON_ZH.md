@@ -215,13 +215,13 @@ ROS 状态发布器会把 0–5 rad 的夹爪电机反馈换算成两个手指�
 
 RS 主要来源：
 
-- `rebotarm_ros2/src/rebotarm_bringup/config/rebotarm_hardware.yaml`
-- `rebotarm_ros2/src/rebotarmcontroller/rebotarmcontroller/hardware_manager.py`
-- `rebotarm_ros2/src/rebotarmcontroller/rebotarmcontroller/motion_profiles.py`
-- `rebotarm_ros2/src/rebotarmcontroller/rebotarmcontroller/motor_passthrough.py`
-- `rebotarm_ros2/src/rebotarmcontroller/rebotarmcontroller/ros_publishers.py`
-- `rebotarm_ros2/src/rebotarm_mujoco_rs/rebotarm_mujoco_rs/mujoco_sync.py`
-- `rebotarm_ros2/src/rebotarmcontroller/rebotarmcontroller/fake_rs_driver.py`
+- `rebotarm_ros2_RS/src/rebotarm_bringup/config/rebotarm_hardware.yaml`
+- `rebotarm_ros2_RS/src/rebotarmcontroller/rebotarmcontroller/hardware_manager.py`
+- `rebotarm_ros2_RS/src/rebotarmcontroller/rebotarmcontroller/motion_profiles.py`
+- `rebotarm_ros2_RS/src/rebotarmcontroller/rebotarmcontroller/motor_passthrough.py`
+- `rebotarm_ros2_RS/src/rebotarmcontroller/rebotarmcontroller/ros_publishers.py`
+- `rebotarm_ros2_RS/src/rebotarm_mujoco_rs/rebotarm_mujoco_rs/mujoco_sync.py`
+- `rebotarm_ros2_RS/src/rebotarmcontroller/rebotarmcontroller/fake_rs_driver.py`
 - `reBotArm_simulator-RS/public/js/ros/rebot-ros-ui.js`
 - `reBotArm_simulator-RS/public/js/rebot-sim.js`
 

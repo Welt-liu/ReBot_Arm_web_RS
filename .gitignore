@@ -1,7 +1,7 @@
-rebotarm_ros2/build/
-rebotarm_ros2/install/
-rebotarm_ros2/log/
-rebotarm_ros2/.venv/
+rebotarm_ros2_RS/build/
+rebotarm_ros2_RS/install/
+rebotarm_ros2_RS/log/
+rebotarm_ros2_RS/.venv/
 /build/
 /install/
 /log/

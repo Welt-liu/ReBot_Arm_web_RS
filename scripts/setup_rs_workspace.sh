@@ -16,7 +16,7 @@ else
   REBOTARM_ROS_DISTRO=jazzy
 fi
 REBOTARM_ROS_SETUP="/opt/ros/${REBOTARM_ROS_DISTRO}/setup.bash"
-REBOTARM_WS="${REBOTARM_RS_ROOT}/rebotarm_ros2"
+REBOTARM_WS="${REBOTARM_RS_ROOT}/rebotarm_ros2_RS"
 REBOTARM_VENV="${REBOTARM_WS}/.venv"
 REBOTARM_SDK_DIR="${REBOTARM_WS}/third_party/reBotArm_control_py"
 REBOTARM_MUJOCO_MODEL_DIR="${REBOTARM_WS}/src/rebotarm_mujoco_rs/models"
@@ -34,7 +34,7 @@ fi
 source "${REBOTARM_ROS_SETUP}"
 
 if [[ ! -x "${REBOTARM_VENV}/bin/python" ]]; then
-  python3 -m venv --system-site-packages "${REBOTARM_VENV}"
+  "/usr/bin/python3" -m venv --system-site-packages "${REBOTARM_VENV}"
 fi
 source "${REBOTARM_VENV}/bin/activate"
 
@@ -55,7 +55,7 @@ if [[ ! -f "${REBOTARM_MUJOCO_MODEL_DIR}/rs_arm.xml" ]] ||
 fi
 
 if find "${REBOTARM_WS}/third_party" -mindepth 2 -maxdepth 2 -name .git -print -quit | grep -q .; then
-  echo "Nested Git metadata found under rebotarm_ros2/third_party." >&2
+  echo "Nested Git metadata found under rebotarm_ros2_RS/third_party." >&2
   echo "Vendor sources must be ordinary files owned by the main repository." >&2
   exit 1
 fi

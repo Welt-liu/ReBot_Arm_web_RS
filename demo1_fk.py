@@ -43,7 +43,7 @@ def find_model():
     candidates = [
         ("install/rebotarm_mujoco/share/rebotarm_mujoco/models/rebotarm_b601_stl.xml", "DM"),
         ("install/rebotarm_mujoco_rs/share/rebotarm_mujoco_rs/models/rs_arm.xml", "RS"),
-        ("rebotarm_ros2/install/rebotarm_mujoco_rs/share/rebotarm_mujoco_rs/models/rs_arm.xml", "RS"),
+        ("rebotarm_ros2_RS/install/rebotarm_mujoco_rs/share/rebotarm_mujoco_rs/models/rs_arm.xml", "RS"),
     ]
     for rel, ver in candidates:
         p = os.path.join(script_dir, rel)

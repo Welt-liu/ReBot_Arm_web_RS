@@ -1,7 +1,7 @@
 # reBot Arm B601-RS 网页控制台
 
 该目录提供 B601-RS 的 Three.js 网页模型、ROS 2 控制面板和可选的
-MotorBridge 高级控制界面。它与仓库中的 `rebotarm_ros2` 使用同一份 RS
+MotorBridge 高级控制界面。它与仓库中的 `rebotarm_ros2_RS` 使用同一份 RS
 URDF/STL；目录内的 `description` 只作为网页被单独复制时的离线后备。
 
 ## 当前能力
@@ -14,6 +14,8 @@ URDF/STL；目录内的 `description` 只作为网页被单独复制时的离线
 | 新版 `JointPosVelCmd`/`JointMitCmd` | 已适配 |
 | RS 夹爪宽度与电机角度换算 | 已适配，71.5 mm ↔ 5 rad |
 | RS MuJoCo 动力学 | 可用，启动脚本默认打开 Viewer 与 physics 模式 |
+| 从零点执行当前姿态 | 可用，默认回零与目标两段各 2 秒 |
+| 目标鬼影生命周期 | 到位或反馈等待超时后自动隐藏 |
 | 三色物体抓取环境 | 可用，含俯视相机、检测、IK 与物理抬升验证 |
 | MCP/Text 抓取 Agent | 可用，MCP 默认 `http://127.0.0.1:8081/mcp` |
 | MotorBridge 直连 | 保留；不能替代物理急停和后端安全层 |

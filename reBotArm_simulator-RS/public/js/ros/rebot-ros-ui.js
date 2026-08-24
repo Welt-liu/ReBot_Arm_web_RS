@@ -179,6 +179,9 @@
   let latestMujocoStateAt = 0;
   let latestGripperPosition = null;
   let latestGripperVelocity = null;
+  let latestMujocoGripperPosition = null;
+  let latestMujocoGripperVelocity = null;
+  let latestMujocoGripperAt = 0;
   let latestGripperAt = 0;
   let pendingGripperSliderWidth = null;
   let gripperSliderPublishFrame = 0;
@@ -431,22 +434,35 @@
     const fingerPosition = gripperIndex >= 0 ? Number(msg.position[gripperIndex]) : NaN;
     if (Number.isFinite(fingerPosition)) {
       const width = mujocoFingerToWidth(fingerPosition);
-      latestGripperPosition = width;
-      latestGripperAt = latestMujocoStateAt;
       const fingerVelocity = Array.isArray(msg.velocity)
         ? Number(msg.velocity[gripperIndex])
         : NaN;
-      latestGripperVelocity = Number.isFinite(fingerVelocity)
+      const widthVelocity = Number.isFinite(fingerVelocity)
         ? Math.abs(fingerVelocity) * OPEN_GRIPPER_M / GRIPPER_FINGER_TRAVEL_M
         : null;
+      // Keep an independent physics-feedback channel.  The fake driver also
+      // publishes gripper/state and must not overwrite the MuJoCo contact
+      // samples used by the grasp completion state machine.
+      latestMujocoGripperPosition = width;
+      latestMujocoGripperVelocity = widthVelocity;
+      latestMujocoGripperAt = latestMujocoStateAt;
+      latestGripperPosition = width;
+      latestGripperAt = latestMujocoStateAt;
+      latestGripperVelocity = widthVelocity;
       if (els.mirror.checked) {
+        const now = performance.now();
         const holdUntil = mirrorHoldUntil.get('gripper') || 0;
         const target = simTargetAngles.get('gripper');
         const reachedTarget = typeof target === 'number' && Math.abs(target - width) < 0.003;
-        if (reachedTarget || performance.now() > holdUntil) {
+        const targetExpired = typeof target === 'number' && holdUntil > 0 && now > holdUntil;
+        if (reachedTarget || targetExpired) {
+          simTargetAngles.delete('gripper');
           mirrorHoldUntil.delete('gripper');
+        }
+        if (reachedTarget || targetExpired || typeof target !== 'number' || now > holdUntil) {
           window.reBotSim.setGripperWidth(width, { source: 'ros', animate: false });
         }
+        hideGhostWhenTargetsRetired();
       }
     }
     updateDiagnostics();
@@ -483,22 +499,24 @@
       const holdUntil = mirrorHoldUntil.get(name) || 0;
       const target = simTargetAngles.get(name);
       const reachedTarget = typeof target === 'number' && Math.abs(target - value) < 0.025;
+      const targetExpired = typeof target === 'number' && holdUntil > 0 && now > holdUntil;
+      const targetRetired = reachedTarget || targetExpired;
+      if (targetRetired) {
+        simTargetAngles.delete(name);
+        mirrorHoldUntil.delete(name);
+      }
       if (TARGET_KEY === 'hardware') {
         queueHardwareSliderFeedback(name, value);
-        if (reachedTarget) {
+        if (targetRetired) {
           if (hardwareSliderJoints.has(name)) hardwareSliderJoints.delete(name);
-          simTargetAngles.delete(name);
-          mirrorHoldUntil.delete(name);
         }
         return;
       }
-      if (reachedTarget || now > holdUntil) {
-        mirrorHoldUntil.delete(name);
+      if (targetRetired || typeof target !== 'number' || now > holdUntil) {
         mirrored[name] = value;
       }
     });
     if (
-      TARGET_KEY === 'hardware' &&
       simTargetAngles.size === 0 &&
       window.reBotSim &&
       typeof window.reBotSim.setGhostVisible === 'function'
@@ -845,7 +863,12 @@
       const width = gripperMotorToWidth(msg.position);
       if (TARGET_KEY === 'hardware' && hardwareBatchFeedbackActive) {
         const target = simTargetAngles.get('gripper');
-        if (typeof target === 'number' && Math.abs(target - width) < 0.003) {
+        const holdUntil = mirrorHoldUntil.get('gripper') || 0;
+        const targetRetired = typeof target === 'number' && (
+          Math.abs(target - width) < 0.003 ||
+          (holdUntil > 0 && performance.now() > holdUntil)
+        );
+        if (targetRetired) {
           simTargetAngles.delete('gripper');
           mirrorHoldUntil.delete('gripper');
         }
@@ -854,32 +877,34 @@
       } else if (TARGET_KEY === 'hardware') {
         const target = simTargetAngles.get('gripper');
         const reachedTarget = typeof target === 'number' && Math.abs(target - width) < 0.003;
-        if (reachedTarget) {
+        const holdUntil = mirrorHoldUntil.get('gripper') || 0;
+        const targetExpired = typeof target === 'number' && holdUntil > 0 && performance.now() > holdUntil;
+        if (reachedTarget || targetExpired) {
           // Once the measured gripper reaches the command, stop drawing the
           // translucent target on top of the solid gripper.  Leaving both at
           // almost the same width makes normal encoder noise look like flicker.
           simTargetAngles.delete('gripper');
           mirrorHoldUntil.delete('gripper');
-          setMessage(t('msg.gripperArrived', { mm: Math.round(width * 1000) }));
-          if (
-            simTargetAngles.size === 0 &&
-            window.reBotSim &&
-            typeof window.reBotSim.setGhostVisible === 'function'
-          ) {
-            window.reBotSim.setGhostVisible(false);
-          }
+          if (reachedTarget) setMessage(t('msg.gripperArrived', { mm: Math.round(width * 1000) }));
+          hideGhostWhenTargetsRetired();
         }
         // The solid gripper represents measured hardware state.  Interpolate
         // only this scalar between ROS samples so TCP/arm state is untouched.
         queueHardwareGripperFeedback(width);
       } else {
+        const now = performance.now();
         const holdUntil = mirrorHoldUntil.get('gripper') || 0;
         const target = simTargetAngles.get('gripper');
         const reachedTarget = typeof target === 'number' && Math.abs(target - width) < 0.003;
-        if (reachedTarget || performance.now() > holdUntil) {
+        const targetExpired = typeof target === 'number' && holdUntil > 0 && now > holdUntil;
+        if (reachedTarget || targetExpired) {
+          simTargetAngles.delete('gripper');
           mirrorHoldUntil.delete('gripper');
+        }
+        if (reachedTarget || targetExpired || typeof target !== 'number' || now > holdUntil) {
           window.reBotSim.setGripperWidth(width, { source: 'ros', animate: false });
         }
+        hideGhostWhenTargetsRetired();
       }
     }
     if (typeof msg.position === 'number' && simTargetAngles.has('gripper')) {
@@ -895,6 +920,16 @@
     updateDiagnostics();
   }
 
+  function hideGhostWhenTargetsRetired() {
+    if (
+      simTargetAngles.size === 0 &&
+      window.reBotSim &&
+      typeof window.reBotSim.setGhostVisible === 'function'
+    ) {
+      window.reBotSim.setGhostVisible(false);
+    }
+  }
+
   function handleArmStatus(msg) {
     latestArmEnabled = Boolean(msg.enabled);
     const enabled = msg.enabled ? t('st.enabled') : t('st.disabled');
@@ -908,6 +943,10 @@
   }
 
  function forwardSimCommand(command) {
+   if (command && command.type === 'execute-current-pose') {
+     void executeCurrentPoseCommand(command);
+     return;
+   }
    if (command && command.type === 'teaching-replay') {
      forwardTeachingReplay(command);
      return;
@@ -984,6 +1023,39 @@
      writeLog(`${command.name} 指令 ${(command.value * 180 / Math.PI).toFixed(1)} 度`, 'info');
    }
  }
+
+  async function executeCurrentPoseCommand(command) {
+    if (!controlAllowed(true)) return;
+    cancelLowLevelPlayback();
+    cancelPendingWebMotionCommands();
+    cancelDampedSliderCommands();
+    const requested = command && command.joints && typeof command.joints === 'object'
+      ? command.joints
+      : {};
+    const start = getCurrentRosPositions();
+    const goal = JOINT_NAMES.map((name, index) => {
+      const value = Number(requested[name]);
+      return Number.isFinite(value) ? value : start[index];
+    });
+    const label = command.label || t('adv.plan');
+    const points = buildZeroToCurrentPosePoints(start, goal, getTrajectoryDuration());
+    await sendTrajectory(points, label);
+  }
+
+  function buildZeroToCurrentPosePoints(start, goal, segmentDuration) {
+    const duration = clamp(Number(segmentDuration) || 2, 1, 30);
+    const zero = JOINT_NAMES.map(() => 0);
+    const toZero = buildSmoothJointMovePoints(start, zero, duration);
+    const fromZero = buildSmoothJointMovePoints(zero, goal, duration)
+      .slice(1)
+      .map((point) => ({
+        ...point,
+        time_from_start: secondsToRosTime(
+          duration + rosTimeToSeconds(point.time_from_start)
+        )
+      }));
+    return [...toZero, ...fromZero];
+  }
 
   function beginTcpDragHandoff() {
     if (TARGET_KEY !== 'hardware') return;
@@ -1978,13 +2050,10 @@
       renderVisionTarget(target);
       writeLog(`自动模式已选择目标：${target.color}`, 'info');
     }
-    const previousTarget = lastVisionTarget && !sameVisionTarget(lastVisionTarget, target)
-      ? lastVisionTarget
-      : null;
     const duration = getPoseDuration();
     setVisionBusy(true, 'move');
     try {
-      const route = buildVisionTransitRoute(previousTarget, target);
+      const route = buildVisionTransitRoute(target);
       for (const waypoint of route) {
         await runVisionMoveStep(waypoint.pose, Math.max(1.1, duration * 0.60), waypoint.label);
       }
@@ -2087,9 +2156,6 @@
       return;
     }
 
-    const previousTarget = lastVisionTarget && !sameVisionTarget(lastVisionTarget, target)
-      ? lastVisionTarget
-      : null;
     let plan = buildVisionPickPlan(target);
     if (!plan) {
       finishVisionSequence();
@@ -2151,10 +2217,11 @@
         }
       };
 
-      const routeStartTarget = carriedTarget && !sameVisionTarget(carriedTarget, target)
-        ? carriedTarget
-        : previousTarget;
-      const route = buildVisionTransitRoute(routeStartTarget, target);
+      // Plan from the arm's measured current pose directly to the new target's
+      // safe high waypoint.  lastVisionTarget describes history, not a
+      // mandatory waypoint; using it here made every target switch revisit the
+      // previous object before moving to the requested one.
+      const route = buildVisionTransitRoute(target);
       const moveHighRoute = async () => {
         for (const waypoint of route) {
           await runIfNeeded(waypoint.pose, Math.max(1.2, duration * 0.65), waypoint.label);
@@ -2201,11 +2268,20 @@
       await runIfNeeded(plan.graspPose, descendDuration, t('msg.pickDescend', { color: target.color }));
 
       await commandGripperAndWait(plan.graspPlan.command, t('msg.pickSqueeze', { color: target.color }), {
-        timeoutMs: 4500,
+        // The physics gripper closes under actuator force instead of jumping
+        // directly to qpos.  A full-open grasp can take more than 4.5 s once
+        // the finger collision pieces begin touching the object, so keep the
+        // sequence alive until the measured fingers have actually settled.
+        timeoutMs: 9000,
         minWaitMs: 850,
         tolerance: 0.006,
         allowContactStop: true,
-        requireContactStop: TARGET_KEY === 'simulation',
+        // The requested width already includes GRASP_SQUEEZE_M.  Requiring the
+        // measured width to stop another 2.5 mm above that target rejects a
+        // valid grasp that settles near the requested squeeze.  Physical pick
+        // success is verified immediately after the first lift by checking the
+        // detected object's real z displacement.
+        requireContactStop: false,
         contactTolerance: 0.0025,
         requireSettled: true,
         settleMs: 420,
@@ -2269,7 +2345,10 @@
       `${reason || '视觉放置'}：下探 ${target.color}`
     );
     await commandGripperAndWait(OPEN_GRIPPER_M, `${reason || '视觉放置'}：松开 ${target.color}`, {
-      timeoutMs: 4500,
+      // MuJoCo's force-driven fingers need the same physical travel time when
+      // opening as when closing.  The previous 4.5 s timeout expired while the
+      // fingers were still moving and prevented release/retreat.
+      timeoutMs: 9000,
       minWaitMs: 850,
       tolerance: 0.006,
       requireReached: true,
@@ -2425,15 +2504,8 @@
     };
   }
 
-  function buildVisionTransitRoute(previousTarget, target) {
+  function buildVisionTransitRoute(target) {
     const route = [];
-    if (previousTarget) {
-      appendVisionRoutePose(
-        route,
-        poseFromVisionTarget(getVisionTransitZ(previousTarget), previousTarget),
-        t('msg.avoidLift', { color: previousTarget.color })
-      );
-    }
     appendVisionRoutePose(
       route,
       poseFromVisionTarget(getVisionTransitZ(target), target),
@@ -2542,7 +2614,7 @@
   }
 
   function buildSmoothJointMovePoints(start, goal, duration) {
-    const seconds = clamp(Number(duration) || 2, 0.35, 8);
+    const seconds = clamp(Number(duration) || 2, 0.35, 30);
     const count = Math.max(10, Math.ceil(seconds * 30));
     const points = [makeTrajectoryPoint(start, 0.05)];
     for (let index = 1; index <= count; index += 1) {
@@ -2851,8 +2923,10 @@
 
     const start = performance.now();
     const initialFeedbackAt = latestGripperAt;
+    const initialMujocoFeedbackAt = latestMujocoGripperAt;
     const initialJointFeedback = gripperJointFeedback();
     let lastPosition = readGripperFeedbackPosition(position);
+    const initialPosition = lastPosition;
     let lastRepublishAt = start;
     let stableSince = start;
     let sawFreshFeedback = false;
@@ -2871,28 +2945,42 @@
       }
 
       const jointFeedback = gripperJointFeedback();
+      const hasFreshMujocoState = TARGET_KEY === 'simulation' &&
+        latestMujocoGripperAt > initialMujocoFeedbackAt &&
+        now - latestMujocoGripperAt < 700;
       const hasFreshGripperState = latestGripperAt > initialFeedbackAt && now - latestGripperAt < 700;
       const hasFreshJointState = jointFeedback.fresh && jointFeedback.stamp !== initialJointFeedback.stamp;
-      const hasFreshFeedback = hasFreshJointState || hasFreshGripperState;
+      const hasFreshFeedback = hasFreshMujocoState || hasFreshJointState || hasFreshGripperState;
       if (!hasFreshFeedback) {
         if (!settings.requireReached && now - start > Math.max(settings.minWaitMs, 900)) break;
         continue;
       }
 
       sawFreshFeedback = true;
-      current = hasFreshJointState ? jointFeedback.widthCommand : Number(latestGripperPosition);
-      source = hasFreshJointState ? 'joint_states/gripper_joint1' : 'gripper/state';
+      current = hasFreshMujocoState
+        ? Number(latestMujocoGripperPosition)
+        : (hasFreshJointState ? jointFeedback.widthCommand : Number(latestGripperPosition));
+      source = hasFreshMujocoState
+        ? 'mujoco/joint_states/gripper_joint1'
+        : (hasFreshJointState ? 'joint_states/gripper_joint1' : 'gripper/state');
       // Number(null) is zero, which previously made simulation feedback look
       // stationary before a velocity sample had ever arrived.
-      const velocity = typeof latestGripperVelocity === 'number'
-        ? latestGripperVelocity
+      const velocitySource = hasFreshMujocoState
+        ? latestMujocoGripperVelocity
+        : latestGripperVelocity;
+      const velocity = typeof velocitySource === 'number'
+        ? velocitySource
         : NaN;
       const closeEnough = Number.isFinite(current) && Math.abs(current - position) <= settings.tolerance;
+      const closingProgress = Number.isFinite(initialPosition) && Number.isFinite(current)
+        ? initialPosition - current
+        : 0;
       // During a closing command, a measured opening that remains above the
       // requested opening proves that the fingers were blocked by an object.
       // Reaching the command exactly is an empty grasp and must not be lifted.
       const contactBlocked = settings.allowContactStop &&
         Number.isFinite(current) &&
+        closingProgress >= Math.max(settings.contactTolerance, 0.003) &&
         current - position >= settings.contactTolerance;
       // MuJoCo kinematic mode intentionally publishes qvel=0 while qpos is
       // being smoothed, so velocity alone cannot prove that the fingers have
@@ -2901,17 +2989,27 @@
         Number.isFinite(lastPosition) &&
         Math.abs(current - lastPosition) < settings.positionStableTolerance;
       const velocityStable = !Number.isFinite(velocity) || Math.abs(velocity) < 0.0025;
-      // Physics contact can leave a tiny non-zero qvel while the fingers are
-      // firmly blocked on the object. In simulation, a stable measured opening
-      // is the reliable contact-stop signal; hardware keeps the velocity check.
+      // Physics mode publishes the real MuJoCo qvel, so it must participate in
+      // the stop decision.  Ignoring it made a slowly closing gripper look
+      // stationary after several small position increments and allowed the arm
+      // to lift before the fingers had finished squeezing.  Kinematic mode is
+      // the only simulation mode whose qvel is intentionally always zero.
+      const hasPhysicsVelocity = TARGET_KEY === 'simulation' &&
+        latestMujocoSimulationMode === 'physics' &&
+        hasFreshMujocoState &&
+        Number.isFinite(velocity);
       const barelyMoving = positionStable && (
-        TARGET_KEY === 'simulation' || velocityStable
+        hasPhysicsVelocity ? (velocityStable || (contactBlocked && Math.abs(velocity) < 0.004)) : (
+          TARGET_KEY === 'simulation' || velocityStable
+        )
       );
       reached = reached || closeEnough;
 
       if (barelyMoving) {
         if (now - stableSince >= settings.settleMs && now - start >= settings.minWaitMs) {
-          if (closeEnough || (!settings.requireReached && settings.allowContactStop)) {
+          if (closeEnough || (
+            !settings.requireReached && settings.allowContactStop && contactBlocked
+          )) {
             settled = true;
             contactStopped = contactStopped || contactBlocked;
             break;
@@ -2957,6 +3055,13 @@
   }
 
   function readGripperFeedbackPosition(commandPosition) {
+    if (
+      TARGET_KEY === 'simulation' &&
+      latestMujocoGripperAt > 0 &&
+      Number.isFinite(Number(latestMujocoGripperPosition))
+    ) {
+      return Number(latestMujocoGripperPosition);
+    }
     const jointFeedback = gripperJointFeedback();
     if (jointFeedback.fresh && Number.isFinite(jointFeedback.widthCommand)) {
       return jointFeedback.widthCommand;
@@ -2974,9 +3079,18 @@
     if (!Number.isFinite(left)) {
       return { fresh: false, widthCommand: NaN, stamp: 0 };
     }
+    // /mujoco/joint_states reports the actual MuJoCo prismatic joint, whose
+    // per-finger travel is 50 mm.  The fake/real RS driver reports the 45 mm
+    // URDF visual joint.  Treating both as 45 mm inflated MuJoCo feedback by
+    // 11%, producing a false contact-stop before physical closure completed.
+    const visualOpen = hasRsJoint
+      ? (TARGET_KEY === 'simulation' && mujocoStateIsFresh()
+        ? GRIPPER_FINGER_TRAVEL_M
+        : 0.045)
+      : 0.0285;
     return {
       fresh: true,
-      widthCommand: fingerOpeningToGripperCommand(left, hasRsJoint ? 0.045 : 0.0285),
+      widthCommand: fingerOpeningToGripperCommand(left, visualOpen),
       stamp: latestJointStateAt || 0
     };
   }
@@ -3048,7 +3162,7 @@
   }
 
   function getTrajectoryDuration() {
-    return clamp(Number(els.trajectoryDuration.value) || 6, 1, 30);
+    return clamp(Number(els.trajectoryDuration.value) || 2, 1, 30);
   }
 
   function secondsToRosTime(seconds) {

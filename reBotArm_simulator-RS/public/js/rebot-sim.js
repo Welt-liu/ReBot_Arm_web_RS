@@ -962,24 +962,19 @@
     stopPath();
     draggingTcp = false;
     dragSettling = false;
-    const destination = { ...currentAngles };
-    const readyPreset = presets.ready;
-    const readyAngles = {};
-
-    jointDefs.forEach((joint, index) => {
-      const raw = readyPreset.angles[index] || 0;
-      readyAngles[joint.name] = clamp(joint.unit === 'm' ? raw / 1000 : raw * DEG, joint.min, joint.max);
-      setJoint(joint.name, readyAngles[joint.name], false, { source: 'ros' });
+    setGhostDisplay(false);
+    const joints = {};
+    jointDefs.forEach((joint) => {
+      if (joint.name !== 'gripper') joints[joint.name] = currentAngles[joint.name] ?? 0;
     });
-
-    syncGhostToRobot();
-    updateGhostTarget(destination);
-    moveToAngles(destination, 1200, {
-      source: 'plan-current',
+    emitCommand({
+      type: 'execute-current-pose',
+      joints,
+      source: 'current-pose-command',
       label: t('adv.plan'),
-      emitBatch: true
+      stamp: performance.now()
     });
-    setDragStatus('已生成：Ready -> 当前姿态');
+    setDragStatus(t('sim.currentPoseRequested'));
   }
 
   function toggleDragMode() {
