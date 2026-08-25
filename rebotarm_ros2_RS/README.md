@@ -103,12 +103,12 @@ Choose and install the appropriate ROS2 distribution from the
 This directory is part of `ReBot_Arm_web_RS`. Clone the parent repository once,
 then enter `rebotarm_ros2_RS`; no separate ROS repository is required.
 
-### Step 3. Install motorbridge
+### Step 3. Install pinned hardware dependencies
 
-Install `motorbridge` from the official PyPI index:
+Install the tested `motorbridge` and Pinocchio versions from the repository lock file:
 
 ```bash
-python3 -m pip install --user --index-url https://pypi.org/simple motorbridge
+python3 -m pip install --user -r ../requirements-rs-hardware.txt
 ```
 
 ### Step 4. Use the vendored low-level SDK
