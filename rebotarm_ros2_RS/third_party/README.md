@@ -6,7 +6,7 @@ nested repository.
 
 | Directory | Upstream | Baseline revision |
 |---|---|---|
-| `reBotArm_control_py` | `vectorBH6/reBotArm_control_py` | `40ab6ce58fec3c58cb603efb3f30240d6f5849e4` |
+| `reBotArm_control_py` | `Yang-Ci/reBotArm_control_py` | `5ba28acef46237eb6a7560658bbc43b06cf8a259` |
 The SDK includes the RS Cartesian trajectory duration safety adjustment. The
 MuJoCo model derived from `LAN-GER/reBot-B601-RS-for-mujoco_sim` revision
 `1249cb6efdf393ba636056fc41df30dc6ba389aa` is integrated directly under

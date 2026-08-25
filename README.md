@@ -42,7 +42,7 @@ cd /home/robot/reBot_Arm_Mujoco-RS
 XML 与 STL 网格已合入 `rebotarm_ros2_RS/src/rebotarm_mujoco_rs/models/`。它们都不是
 submodule 或嵌套 Git 仓库，一次普通 clone 即可取得完整构建输入。来源基线为：
 
-- `vectorBH6/reBotArm_control_py`：`40ab6ce58fec3c58cb603efb3f30240d6f5849e4`
+- `Yang-Ci/reBotArm_control_py`：`5ba28acef46237eb6a7560658bbc43b06cf8a259`
 - `LAN-GER/reBot-B601-RS-for-mujoco_sim`：`1249cb6efdf393ba636056fc41df30dc6ba389aa`
 
 这里只使用 MuJoCo 上游工程的模型资源，不依赖其 `rebot_b601_rs_sim` 算法、示例或测试。
@@ -207,3 +207,53 @@ node --check reBotArm_simulator-RS/public/js/rebot-sim.js
 - 不提交 `.env`、密钥、ROS bag、`build/`、`install/`、`log/`；
 - 真机参数更改必须先仿真、再低速单关节、最后完整回归；
 - 普通问题优先查 [数据流文档](DATA_FLOW_RS_ZH.md)
+
+## RS 重力补偿模型
+
+网页启动重力补偿时的实际链路为：
+
+`/gravity_compensation/start` → ROS `HardwareManager` → SDK `RebotArm` →
+`compute_generalized_gravity()` → RS URDF → `motorbridge` → `can0`
+
+ROS 不直接调用 SDK 的
+[`GravityCompensation.start()`](rebotarm_ros2_RS/third_party/reBotArm_control_py/reBotArm_control_py/controllers/gravity_compensation.py)，
+因为该控制器会自行管理连接、使能状态，并在 125 Hz 循环中主动请求 CAN 反馈，可能与
+ROS 已建立的连接和异步反馈循环冲突。ROS 适配层还提供：
+
+- 启动增益平滑过渡；
+- 20 Hz 异步硬件反馈缓存；
+- `tau_scale` 和关节方向配置；
+- 状态机、重复启动保护；
+- 停止后位置保持。
+
+当前 SDK URDF 相比旧模型的质量调整如下：
+
+| Link | 旧质量 | 新质量 | 变化 |
+|---|---:|---:|---:|
+| link2 | 1.972 kg | 1.552 kg | −0.420 kg |
+| link3 | 1.062 kg | 1.252 kg | +0.190 kg |
+| link4 | 0.660 kg | 0.460 kg | −0.200 kg |
+| link5 | 0.1501 kg | 0.2012 kg | +0.0511 kg |
+| link6 | 0.030 kg | 0.100 kg | +0.070 kg |
+
+Pinocchio 模型总质量从约 6.3174 kg 降为 6.0085 kg。零位重力矩变化如下：
+
+| 关节 | 旧版 | 新版 | 变化 |
+|---|---:|---:|---:|
+| J2 | +1.833 N·m | +1.545 N·m | −15.7% |
+| J3 | +6.704 N·m | +6.764 N·m | +0.9% |
+| J4 | +1.957 N·m | +2.001 N·m | +2.2% |
+
+在 J2≈33.6° 姿态，J2 原始重力矩从约 +0.293 N·m 降为 +0.069 N·m；乘以当前
+`tau_scale[J2]=0.92` 后，约从 +0.270 N·m 降为 +0.063 N·m。
+
+以下动力学内容没有改变：
+
+- link 的质心 inertial/origin；
+- 惯量矩阵 ixx/iyy/izz/ixy/ixz/iyz；
+- J1–J6 的关节原点；
+- J1–J6 的旋转轴方向；
+- J1–J6 的关节限位；
+- 连杆拓扑结构。
+
+静态重力补偿主要取决于质量和质心，因此质量调整会直接改变 `g(q)`。

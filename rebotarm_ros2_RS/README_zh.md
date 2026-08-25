@@ -101,12 +101,12 @@ ip -details link show can0
 本目录已经包含在 `ReBot_Arm_web_RS` 父仓库中。只需 clone 一次父仓库，再进入
 `rebotarm_ros2_RS`，无需另外获取 ROS 仓库。
 
-### Step 3. 安装 motorbridge
+### Step 3. 安装锁定版本的硬件依赖
 
-`motorbridge` 从 PyPI 官方源安装：
+通过仓库依赖文件安装已经验证的 `motorbridge` 和 Pinocchio 版本：
 
 ```bash
-python3 -m pip install --user --index-url https://pypi.org/simple motorbridge
+python3 -m pip install --user -r ../requirements-rs-hardware.txt
 ```
 
 ### Step 4. 使用本地底层 SDK

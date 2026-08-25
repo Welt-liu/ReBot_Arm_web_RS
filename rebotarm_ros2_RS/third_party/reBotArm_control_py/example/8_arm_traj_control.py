@@ -11,7 +11,7 @@ Input: x y z [roll pitch yaw] [duration]  target end-effector pose (meters / rad
 用法 / Usage:
     python example/8_arm_traj_control.py
 
-退出 / Exit: q / quit / exit
+退出 / Exit: q / quit / exit /ctrl+c
 状态 / State: state, end_state
 """
 
@@ -25,7 +25,7 @@ from reBotArm_control_py.controllers import RebotArmEndPose
 
 def main() -> None:
     rebotarm = RebotArm()
-    ctrl = RebotArmEndPose(rebotarm, arm_control_mode="mit")
+    ctrl = RebotArmEndPose(rebotarm)
 
     ctrl.start()
     print("--- 已启动末端位置控制器 ---\n")
@@ -34,7 +34,7 @@ def main() -> None:
     while True:
         try:
             line = input("> ").strip()
-        except EOFError:
+        except (EOFError, KeyboardInterrupt):
             break
 
         if not line:

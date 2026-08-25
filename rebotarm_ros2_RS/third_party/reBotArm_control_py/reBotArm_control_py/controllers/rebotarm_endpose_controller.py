@@ -80,9 +80,11 @@ class RebotArmEndPose:
         rebotarm: RebotArm,
         dt: float = 0.01,
         profile: TrajProfile = TrajProfile.MIN_JERK,
-        arm_control_mode: str = "posvel",
+        arm_control_mode: str | None = None,
         use_gravity_ff: bool = True,
     ) -> None:
+        if arm_control_mode is None:
+            arm_control_mode = rebotarm.arm_control_mode
         if arm_control_mode not in ("mit", "posvel"):
             raise ValueError("arm_control_mode must be 'mit' or 'posvel'")
         self._arm_control_mode = arm_control_mode
@@ -121,7 +123,6 @@ class RebotArmEndPose:
 
         self._home_vel: float = 0.5
         self._vlim_override: Optional[np.ndarray] = None
-        self._last_traj_duration: float = 0.0
 
     # ── 生命周期 ───────────────────────────────────────────────────────────
 
@@ -309,15 +310,6 @@ class RebotArmEndPose:
 
         pts = [pt.q[: self._n].copy() for pt in joint_traj]
 
-        # Stretch Cartesian trajectories when their joint-space path would
-        # exceed the RS hardware safety speed.  This is a final protection for
-        # action callers that request an unrealistically short duration.
-        path = np.vstack([q_start[: self._n], *pts])
-        per_joint_travel = np.sum(np.abs(np.diff(path, axis=0)), axis=0)
-        minimum_duration = 1.25 * float(np.max(per_joint_travel)) / 0.60
-        duration = max(float(duration), 0.8, minimum_duration)
-        self._last_traj_duration = duration
-
         self._stop_send.set()
         if self._send_thread is not None:
             self._send_thread.join(timeout=5.0)
@@ -341,8 +333,8 @@ class RebotArmEndPose:
                     q_now = self._arm_group.get_positions(request_feedback=False)
                     q_now = pad_q_for_model(self._model, q_now, self._n)
                     tau_ff = compute_generalized_gravity(self._model, q_now, self._data)[: self._n]
-                    tau_ff[1] *= 1.55  # joint2 额外补偿
-                    tau_ff[2] *= 1.55  # joint3 额外补偿
+                    # tau_ff[1] *= 1.55  # joint2 额外补偿
+                    # tau_ff[2] *= 1.55  # joint3 额外补偿
                     
                 self._arm_group.send_mit(
                     self._q_target,
@@ -364,6 +356,7 @@ class RebotArmEndPose:
                 kp=self._gripper_group._mit_kp,
                 kd=self._gripper_group._mit_kd,
             )
+
 
     # ── 轨迹发送线程 ──────────────────────────────────────────────────────
 
