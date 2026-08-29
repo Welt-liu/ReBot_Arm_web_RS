@@ -116,19 +116,55 @@ body {
   position: absolute;
   left: 0;
   top: 0;
-  width: 158px;
-  padding: 7px 9px 6px;
+  width: max-content;
+  max-width: calc(50vw - 16px);
+  padding: 5px 7px;
   border: 1px solid var(--callout-color, #3b4a44);
   border-radius: 10px;
   background: rgba(22, 26, 24, 0.88);
   backdrop-filter: blur(8px);
   pointer-events: auto;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
-  touch-action: none;
+  touch-action: manipulation;
   user-select: none;
+  cursor: pointer;
+  z-index: 3;
+}
+
+.callout-chip .callout-body,
+.callout-chip .target-readout {
+  display: none;
+}
+
+.callout-chip .callout-header {
+  margin-bottom: 0;
+}
+
+.callout-chip.is-open,
+.callout-chip:focus-within {
+  padding: 5px 7px 6px;
+  cursor: default;
+}
+
+.callout-chip.is-open .callout-header,
+.callout-chip:focus-within .callout-header {
+  margin-bottom: 4px;
+}
+
+.callout-chip.is-open .callout-body,
+.callout-chip:focus-within .callout-body {
+  display: block;
+}
+
+.callout-chip.is-open .target-readout,
+.callout-chip:focus-within .target-readout {
+  display: inline;
 }
 
 .callout-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--callout-color, #8fd7c1);
   font-weight: 600;
 }
@@ -137,7 +173,8 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  gap: 8px;
+  gap: 6px;
+  min-width: 0;
   margin-bottom: 4px;
   font-size: 11px;
   color: #b7c4bd;
@@ -146,8 +183,19 @@ body {
 
 .callout-header strong {
   display: flex;
-  gap: 4px;
+  flex: 0 0 auto;
+  gap: 3px;
   font-weight: 600;
+  justify-content: flex-end;
+  font-variant-numeric: tabular-nums;
+}
+
+.callout-chip .actual {
+  min-width: 6.2ch;
+  text-align: right;
+  color: #e6ece8;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }
 
 .callout-chip .target-readout::before {
@@ -158,10 +206,6 @@ body {
 
 .callout-chip.is-hidden {
   visibility: hidden;
-}
-
-.callout-chip .actual {
-  color: #e6ece8;
 }
 
 .callout-chip .target-readout {
@@ -307,5 +351,22 @@ button:hover {
   .panel {
     border-left: 0;
     border-top: 1px solid #2a332f;
+  }
+
+  .callout-chip,
+  .callout-chip.is-open,
+  .callout-chip:focus-within {
+    padding: 4px 6px;
+    max-width: calc(50vw - 12px);
+  }
+
+  .callout-header {
+    gap: 4px;
+    font-size: 10px;
+  }
+
+  .callout-chip.is-open .target-readout,
+  .callout-chip:focus-within .target-readout {
+    display: none;
   }
 }

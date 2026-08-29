@@ -3,9 +3,16 @@ import { t } from './i18n.js';
 const PAD = 8;
 const GAP = 8;
 
+function formatFixed(value, digits) {
+  const factor = 10 ** digits;
+  let rounded = Math.round(value * factor) / factor;
+  if (Math.abs(rounded) < 0.5 / factor) rounded = 0;
+  return rounded.toFixed(digits);
+}
+
 function format(joint, amount) {
-  if (joint.unit === 'm') return `${(amount * 1000).toFixed(1)} mm`;
-  return `${((amount * 180) / Math.PI).toFixed(1)}°`;
+  if (joint.unit === 'm') return `${formatFixed(amount * 1000, 1)} mm`;
+  return `${formatFixed((amount * 180) / Math.PI, 1)}°`;
 }
 
 function clamp(value, min, max) {
@@ -57,6 +64,8 @@ export function createJointCallouts(root, joints, onChange) {
     value.append(actualEl, targetEl);
     header.append(name, value);
 
+    const body = document.createElement('div');
+    body.className = 'callout-body';
     const slider = document.createElement('input');
     slider.type = 'range';
     slider.min = String(joint.min);
@@ -68,8 +77,22 @@ export function createJointCallouts(root, joints, onChange) {
       onChange(joint.name, Number(slider.value));
       targetEl.textContent = format(joint, Number(slider.value));
     });
+    body.append(slider);
     chip.addEventListener('pointerdown', (event) => event.stopPropagation());
-    chip.append(header, slider);
+    chip.addEventListener('mouseenter', () => {
+      if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+      setOpen(chip, true);
+    });
+    chip.addEventListener('mouseleave', () => {
+      if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+      setOpen(chip, false);
+    });
+    chip.addEventListener('click', (event) => {
+      if (event.target.closest('input')) return;
+      if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+      setOpen(chip, !chip.classList.contains('is-open'));
+    });
+    chip.append(header, body);
     root.append(chip);
 
     const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
@@ -99,6 +122,34 @@ export function createJointCallouts(root, joints, onChange) {
     };
   });
 
+  function invalidateLayout() {
+    placedWidth = -1;
+  }
+
+  function setOpen(chip, open) {
+    root.querySelectorAll('.callout-chip.is-open').forEach((el) => {
+      if (el !== chip) el.classList.remove('is-open');
+    });
+    chip.classList.toggle('is-open', open);
+    invalidateLayout();
+  }
+
+  function closeOpenChips() {
+    let changed = false;
+    root.querySelectorAll('.callout-chip.is-open').forEach((el) => {
+      el.classList.remove('is-open');
+      changed = true;
+    });
+    if (changed) invalidateLayout();
+  }
+
+  const host = root.parentElement;
+  if (host) {
+    host.addEventListener('pointerdown', (event) => {
+      if (!event.target.closest('.callout-chip')) closeOpenChips();
+    });
+  }
+
   function writeTarget(item, amount) {
     item.slider.value = String(amount);
     item.targetEl.textContent = format(item.joint, amount);
@@ -122,10 +173,10 @@ export function createJointCallouts(root, joints, onChange) {
       item.chip.classList.remove('is-hidden');
       const w = Math.max(1, item.chip.offsetWidth);
       const h = Math.max(1, item.chip.offsetHeight);
-      const twoColumns = width >= w * 2 + PAD * 3;
+      const twoColumns = width >= 280;
       const side = twoColumns ? item.side : 'right';
-      const chipX = side === 'right' ? width - w - PAD : PAD;
-      const entry = { item, chipX, w, h, side };
+      item.chip.dataset.side = side;
+      const entry = { item, w, h, side };
       (side === 'right' ? right : left).push(entry);
     });
 
@@ -134,13 +185,21 @@ export function createJointCallouts(root, joints, onChange) {
     packColumn(right, height);
 
     [...left, ...right].forEach((entry) => {
-      const { item, chipX, chipY, w, h, side } = entry;
-      item.chip.style.transform = `translate(${chipX}px, ${chipY}px)`;
-      item.attachX = side === 'right' ? chipX : chipX + w;
-      item.attachY = chipY + h / 2;
-      item.line.setAttribute('x2', String(item.attachX));
-      item.line.setAttribute('y2', String(item.attachY));
+      const { item, chipY, side } = entry;
+      item.chip.style.left = side === 'right' ? 'auto' : `${PAD}px`;
+      item.chip.style.right = side === 'right' ? `${PAD}px` : 'auto';
+      item.chip.style.transform = `translateY(${chipY}px)`;
     });
+  }
+
+  function attachPoint(item) {
+    const rootRect = root.getBoundingClientRect();
+    const chipRect = item.chip.getBoundingClientRect();
+    const side = item.chip.dataset.side || item.side;
+    return {
+      x: side === 'right' ? chipRect.left - rootRect.left : chipRect.right - rootRect.left,
+      y: chipRect.top - rootRect.top + chipRect.height / 2
+    };
   }
 
   function layout(projectWorld, data) {
@@ -157,12 +216,15 @@ export function createJointCallouts(root, joints, onChange) {
         item.dot.setAttribute('visibility', 'hidden');
         return;
       }
+      const attach = attachPoint(item);
+      item.attachX = attach.x;
+      item.attachY = attach.y;
       item.line.setAttribute('visibility', 'visible');
       item.dot.setAttribute('visibility', 'visible');
       item.line.setAttribute('x1', String(screen.x));
       item.line.setAttribute('y1', String(screen.y));
-      item.line.setAttribute('x2', String(item.attachX));
-      item.line.setAttribute('y2', String(item.attachY));
+      item.line.setAttribute('x2', String(attach.x));
+      item.line.setAttribute('y2', String(attach.y));
       item.dot.setAttribute('cx', String(screen.x));
       item.dot.setAttribute('cy', String(screen.y));
     });
