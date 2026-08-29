@@ -1,4 +1,4 @@
-const MODEL_DIR = '/models';
+const MODEL_DIR = `${import.meta.env.BASE_URL}models`;
 const SCENE_XML = 'rs_grasp_scene.xml';
 
 export async function loadMujocoModule() {

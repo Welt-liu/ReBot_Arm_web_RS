@@ -20,6 +20,25 @@ npm run dev
 
 打开 [http://127.0.0.1:5173](http://127.0.0.1:5173)。首次会下载约 62 MB STL，之后走浏览器缓存。
 
+## GitHub Pages
+
+推送到 `main` 或 `feat/web-mujoco-m1` 后，Actions 会构建并发布静态站。仓库需在
+**Settings → Pages → Source** 选择 **GitHub Actions**（只需设一次）。
+
+地址为：
+
+`https://<owner>.github.io/ReBot_Arm_web_RS/`
+
+首次打开会下载全部网格，请用 Chrome 或 Edge。
+
+本地预览生产包：
+
+```bash
+cd web_mujoco
+GITHUB_PAGES_BASE=/ReBot_Arm_web_RS/ npm run build
+npx vite preview
+```
+
 ## M1 验收
 
 - 手臂、桌面、红/蓝/黄物体可见
