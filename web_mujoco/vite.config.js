@@ -6,7 +6,7 @@ import { defineConfig } from 'vite';
 const root = path.dirname(fileURLToPath(import.meta.url));
 const modelsSrc = path.resolve(
   root,
-  '../rebotarm_ros2/src/rebotarm_mujoco_rs/models'
+  '../rebotarm_ros2_RS/src/rebotarm_mujoco_rs/models'
 );
 
 function pagesBase() {

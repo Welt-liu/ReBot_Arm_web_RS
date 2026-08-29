@@ -7,7 +7,7 @@ import { createPhysicsController } from '../src/pd-control.js';
 import { createTcpIk } from '../src/tcp-ik.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const modelsDir = path.resolve(here, '../../rebotarm_ros2/src/rebotarm_mujoco_rs/models');
+const modelsDir = path.resolve(here, '../../rebotarm_ros2_RS/src/rebotarm_mujoco_rs/models');
 
 function namedId(mujoco, model, type, name) {
   const id = mujoco.mj_name2id(model, type, name);

@@ -6,7 +6,7 @@ on:
     paths:
       - 'web_mujoco/**'
       - '.github/workflows/pages.yml'
-      - 'rebotarm_ros2/src/rebotarm_mujoco_rs/models/**'
+      - 'rebotarm_ros2_RS/src/rebotarm_mujoco_rs/models/**'
   workflow_dispatch:
 
 permissions:
