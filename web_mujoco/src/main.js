@@ -21,6 +21,19 @@ const viewportEl = document.getElementById('viewport');
 const langSwitchEl = document.getElementById('lang-select');
 const loadingOverlayEl = document.getElementById('loading-overlay');
 const loadingTextEl = document.getElementById('loading-text');
+const loadingProgressEl = document.getElementById('loading-progress');
+const loadingProgressFillEl = document.getElementById('loading-progress-fill');
+const loadingProgressValueEl = document.getElementById('loading-progress-value');
+
+const LOAD_STAGE_PROGRESS = {
+  'status.booting': 12,
+  'status.loadingWasm': 49,
+  'status.download': 69,
+  'status.downloadProgress': 69,
+  'status.loadingAssets': 69,
+  'status.compiling': 89,
+  'status.compiled': 99
+};
 
 bindLangSwitch(langSwitchEl);
 applyStaticI18n();
@@ -31,6 +44,47 @@ function setStatus(text) {
 
 let loadProgress = { key: 'status.booting', vars: {} };
 let loadingComplete = false;
+let visualProgress = 0;
+let visualProgressTarget = 0;
+let visualProgressFrame = 0;
+let visualProgressQueue = Promise.resolve();
+
+function renderVisualProgress(value) {
+  const rounded = Math.round(value);
+  if (loadingProgressFillEl) loadingProgressFillEl.style.width = `${value}%`;
+  if (loadingProgressValueEl) loadingProgressValueEl.textContent = `${rounded}%`;
+  loadingProgressEl?.setAttribute('aria-valuenow', String(rounded));
+}
+
+function animateVisualProgress(next) {
+  return new Promise((resolve) => {
+    const start = visualProgress;
+    const startedAt = performance.now();
+    const duration = next >= 100 ? 120 : 240;
+
+    const animate = (now) => {
+      const ratio = Math.max(0, Math.min(1, (now - startedAt) / duration));
+      const eased = 1 - (1 - ratio) ** 3;
+      visualProgress = start + (next - start) * eased;
+      renderVisualProgress(visualProgress);
+      if (ratio < 1) {
+        visualProgressFrame = requestAnimationFrame(animate);
+      } else {
+        visualProgress = next;
+        renderVisualProgress(next);
+        resolve();
+      }
+    };
+    visualProgressFrame = requestAnimationFrame(animate);
+  });
+}
+
+function setVisualProgress(next) {
+  if (next <= visualProgressTarget) return visualProgressQueue;
+  visualProgressTarget = next;
+  visualProgressQueue = visualProgressQueue.then(() => animateVisualProgress(next));
+  return visualProgressQueue;
+}
 
 function renderLoadProgress() {
   const text = t(loadProgress.key, loadProgress.vars);
@@ -40,16 +94,20 @@ function renderLoadProgress() {
 
 function setLoadProgress(progress) {
   loadProgress = typeof progress === 'string' ? { key: progress, vars: {} } : progress;
+  setVisualProgress(LOAD_STAGE_PROGRESS[loadProgress.key] ?? visualProgressTarget);
   renderLoadProgress();
 }
 
 function finishLoading() {
   loadingComplete = true;
-  loadingOverlayEl?.classList.add('is-hidden');
+  void setVisualProgress(100).then(() => {
+    window.setTimeout(() => loadingOverlayEl?.classList.add('is-hidden'), 80);
+  });
   void persistAppShell();
 }
 
 renderLoadProgress();
+setVisualProgress(LOAD_STAGE_PROGRESS['status.booting']);
 
 let panel = null;
 let tcpDrag = null;

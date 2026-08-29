@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rebot-mujoco-runtime-v1';
+const CACHE_NAME = 'rebot-mujoco-runtime-v3';
 let currentModelVersion = null;
 let prunePromise = null;
 
@@ -62,6 +62,11 @@ async function cacheFirst(request, event) {
   const cache = await caches.open(CACHE_NAME);
   const url = new URL(request.url);
   await pruneOldModels(cache, url.pathname.includes('/models/') ? url.searchParams.get('v') : null);
+  if (url.pathname.includes('/models/') && url.pathname.toLowerCase().endsWith('.gzbin')) {
+    const rawUrl = new URL(url.href);
+    rawUrl.pathname = rawUrl.pathname.slice(0, -6);
+    await cache.delete(rawUrl.href);
+  }
   const cached = await cache.match(request);
   if (cached) return cached;
   const response = await fetch(request);

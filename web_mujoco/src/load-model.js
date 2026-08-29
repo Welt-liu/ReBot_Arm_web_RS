@@ -2,9 +2,14 @@ const MODEL_DIR = `${import.meta.env.BASE_URL}models`;
 const SCENE_XML = 'rs_grasp_scene.xml';
 const DOWNLOAD_CONCURRENCY = 6;
 const MODEL_VERSION = typeof __MODEL_VERSION__ === 'undefined' ? 'dev' : __MODEL_VERSION__;
+const SUPPORTS_GZIP_STREAM = typeof DecompressionStream === 'function';
 
-function modelUrl(relative) {
-  return `${MODEL_DIR}/${relative}?v=${MODEL_VERSION}`;
+function isMeshFile(relative) {
+  return /\.(?:stl|obj|msh)$/i.test(relative);
+}
+
+function modelUrl(relative, compressed = false) {
+  return `${MODEL_DIR}/${relative}${compressed ? '.gzbin' : ''}?v=${MODEL_VERSION}`;
 }
 
 export async function loadMujocoModule() {
@@ -31,6 +36,26 @@ async function fetchBytes(url, onChunk) {
   const bytes = new Uint8Array(await response.arrayBuffer());
   onChunk?.(bytes.byteLength, total || bytes.byteLength);
   return bytes;
+}
+
+async function decompressGzip(bytes) {
+  if (bytes[0] !== 0x1f || bytes[1] !== 0x8b) return bytes;
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+async function fetchModelBytes(relative, onChunk) {
+  const compressed = SUPPORTS_GZIP_STREAM && isMeshFile(relative);
+  if (compressed) {
+    try {
+      const packed = await fetchBytes(modelUrl(relative, true), onChunk);
+      return { bytes: await decompressGzip(packed), transferred: packed.byteLength };
+    } catch (error) {
+      console.warn(`压缩模型读取失败，回退原始资源：${relative}`, error);
+    }
+  }
+  const bytes = await fetchBytes(modelUrl(relative), onChunk);
+  return { bytes, transferred: bytes.byteLength };
 }
 
 function report(onProgress, key, vars = {}) {
@@ -113,6 +138,7 @@ export async function loadRsScene(mujoco, onProgress) {
   const meshFiles = new Set();
   const files = {};
   let loadedBytes = 0;
+  let transferredBytes = 0;
 
   try {
     // Resolve the small XML dependency graph first so every mesh is known
@@ -122,13 +148,14 @@ export async function loadRsScene(mujoco, onProgress) {
       if (seen.has(relative)) continue;
       seen.add(relative);
       report(onProgress, 'status.download', { file: relative });
-      const bytes = await fetchBytes(modelUrl(relative), (received, total) => {
+      const { bytes, transferred } = await fetchModelBytes(relative, (received, total) => {
         const mb = total ? `${(received / 1048576).toFixed(1)} / ${(total / 1048576).toFixed(1)} MB` : '';
         report(onProgress, 'status.downloadProgress', { file: relative, mb });
       });
       files[relative] = bytes;
       addToVfs(vfs, relative, bytes);
       loadedBytes += bytes.byteLength;
+      transferredBytes += transferred;
 
       const xml = new TextDecoder().decode(bytes);
       for (const extra of parseIncludesAndMeshes(xml)) {
@@ -154,7 +181,7 @@ export async function loadRsScene(mujoco, onProgress) {
       report(onProgress, 'status.loadingAssets', {
         done: completedAssets,
         total: totalAssets,
-        mb: ((loadedBytes + inFlightBytes) / 1048576).toFixed(1)
+        mb: ((transferredBytes + inFlightBytes) / 1048576).toFixed(1)
       });
     }
 
@@ -166,14 +193,14 @@ export async function loadRsScene(mujoco, onProgress) {
         seen.add(relative);
         activeBytes.set(relative, 0);
         reportAssetProgress(true);
-        const bytes = await fetchBytes(modelUrl(relative), (received) => {
+        const { bytes, transferred } = await fetchModelBytes(relative, (received) => {
           activeBytes.set(relative, received);
           reportAssetProgress();
         });
         activeBytes.delete(relative);
-        files[relative] = bytes;
         addToVfs(vfs, relative, bytes);
         loadedBytes += bytes.byteLength;
+        transferredBytes += transferred;
         completedAssets += 1;
         reportAssetProgress(true);
       }
@@ -187,7 +214,7 @@ export async function loadRsScene(mujoco, onProgress) {
     const model = createModelFromVfs(mujoco, files, vfs);
     const data = new mujoco.MjData(model);
     mujoco.mj_forward(model, data);
-    return { model, data, loadedBytes, files: Object.keys(files), materialProps };
+    return { model, data, loadedBytes, files: [...seen], materialProps };
   } finally {
     vfs.delete();
   }

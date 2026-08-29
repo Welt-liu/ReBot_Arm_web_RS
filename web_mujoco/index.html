@@ -13,6 +13,12 @@
         <div class="loading-ring" aria-hidden="true"></div>
         <p class="loading-title" data-i18n="loading.title">正在构建数字孪生</p>
         <p class="loading-text" id="loading-text">正在启动…</p>
+        <div class="loading-progress" id="loading-progress" role="progressbar" aria-label="Loading" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div class="loading-progress-track" aria-hidden="true">
+            <div class="loading-progress-fill" id="loading-progress-fill"></div>
+          </div>
+          <span class="loading-progress-value" id="loading-progress-value">0%</span>
+        </div>
       </div>
       <div class="callouts" id="callouts"></div>
       <div id="drag-cluster" class="drag-cluster">

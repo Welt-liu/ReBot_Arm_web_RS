@@ -1,5 +1,6 @@
-import { cpSync, createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { cpSync, createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { gzipSync } from 'node:zlib';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
@@ -31,6 +32,22 @@ function hashModelFiles() {
 }
 
 const modelVersion = hashModelFiles();
+const devGzipCache = new Map();
+
+function isMeshFile(filePath) {
+  return ['.stl', '.obj', '.msh'].includes(path.extname(filePath).toLowerCase());
+}
+
+function writeCompressedMeshes(sourceRoot, destinationRoot) {
+  collectFiles(sourceRoot)
+    .filter(isMeshFile)
+    .forEach((sourcePath) => {
+      const relative = path.relative(sourceRoot, sourcePath);
+      const destination = path.join(destinationRoot, `${relative}.gzbin`);
+      mkdirSync(path.dirname(destination), { recursive: true });
+      writeFileSync(destination, gzipSync(readFileSync(sourcePath), { level: 9 }));
+    });
+}
 
 function pagesBase() {
   const value = process.env.GITHUB_PAGES_BASE;
@@ -61,6 +78,7 @@ export default defineConfig({
         const dest = path.resolve(root, 'dist/models');
         mkdirSync(path.resolve(root, 'dist'), { recursive: true });
         cpSync(modelsSrc, dest, { recursive: true, dereference: true });
+        writeCompressedMeshes(modelsSrcAbs, dest);
       },
       configureServer(server) {
         server.middlewares.use((req, res, next) => {
@@ -69,12 +87,14 @@ export default defineConfig({
           const url = decodeURIComponent(req.url || '');
           if (!url.startsWith(prefix)) return next();
           const rel = url.slice(prefix.length).split('?')[0];
-          const filePath = path.join(modelsSrcAbs, rel);
-          if (!filePath.startsWith(modelsSrcAbs)) return next();
+          const wantsGzip = rel.toLowerCase().endsWith('.gzbin');
+          const sourceRel = wantsGzip ? rel.slice(0, -6) : rel;
+          const filePath = path.resolve(modelsSrcAbs, sourceRel);
+          if (!filePath.startsWith(`${modelsSrcAbs}${path.sep}`)) return next();
           try {
             const stat = statSync(filePath);
             if (!stat.isFile()) return next();
-            const etag = `W/"${stat.size.toString(16)}-${Math.trunc(stat.mtimeMs).toString(16)}"`;
+            const etag = `W/"${stat.size.toString(16)}-${Math.trunc(stat.mtimeMs).toString(16)}${wantsGzip ? '-gz' : ''}"`;
             const ext = path.extname(filePath).toLowerCase();
             const types = {
               '.xml': 'text/xml',
@@ -82,8 +102,7 @@ export default defineConfig({
               '.obj': 'text/plain',
               '.msh': 'application/octet-stream'
             };
-            res.setHeader('Content-Type', types[ext] || 'application/octet-stream');
-            res.setHeader('Content-Length', stat.size);
+            res.setHeader('Content-Type', wantsGzip ? 'application/gzip' : (types[ext] || 'application/octet-stream'));
             // Model meshes are large and rarely change. Reuse them directly on
             // ordinary reloads; a hard refresh still revalidates against ETag.
             res.setHeader('Cache-Control', 'public, max-age=3600, must-revalidate');
@@ -91,10 +110,21 @@ export default defineConfig({
             res.setHeader('Last-Modified', stat.mtime.toUTCString());
             if (req.headers['if-none-match'] === etag) {
               res.statusCode = 304;
-              res.removeHeader('Content-Length');
               res.end();
               return;
             }
+            if (wantsGzip && isMeshFile(filePath)) {
+              const cacheKey = `${filePath}:${stat.size}:${stat.mtimeMs}`;
+              let compressed = devGzipCache.get(cacheKey);
+              if (!compressed) {
+                compressed = gzipSync(readFileSync(filePath), { level: 9 });
+                devGzipCache.set(cacheKey, compressed);
+              }
+              res.setHeader('Content-Length', compressed.byteLength);
+              res.end(compressed);
+              return;
+            }
+            res.setHeader('Content-Length', stat.size);
             createReadStream(filePath).pipe(res);
           } catch {
             next();

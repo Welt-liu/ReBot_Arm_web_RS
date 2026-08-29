@@ -96,6 +96,53 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.loading-progress {
+  display: grid;
+  grid-template-columns: minmax(180px, 320px) 42px;
+  align-items: center;
+  gap: 10px;
+  width: min(372px, 82vw);
+  margin-top: 4px;
+}
+
+.loading-progress-track {
+  position: relative;
+  height: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(74, 190, 255, 0.34);
+  border-radius: 999px;
+  background: rgba(3, 19, 48, 0.82);
+  box-shadow: inset 0 0 12px rgba(0, 25, 76, 0.9), 0 0 14px rgba(0, 170, 255, 0.12);
+}
+
+.loading-progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #126cff 0%, #21c7ff 58%, #70f7ff 100%);
+  box-shadow: 0 0 14px rgba(32, 211, 255, 0.82);
+}
+
+.loading-progress-fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 20%, rgba(255, 255, 255, 0.72) 48%, transparent 74%);
+  transform: translateX(-120%);
+  animation: loading-scan 1.15s ease-in-out infinite;
+}
+
+.loading-progress-value {
+  color: #8eeeff;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
+  text-shadow: 0 0 10px rgba(48, 222, 255, 0.62);
+  font-variant-numeric: tabular-nums;
+}
+
 .loading-overlay.is-error .loading-ring {
   border-color: rgba(255, 99, 99, 0.22);
   border-top-color: #ff6b72;
@@ -106,10 +153,16 @@ body {
   to { transform: rotate(360deg); }
 }
 
+@keyframes loading-scan {
+  55%,
+  100% { transform: translateX(120%); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .loading-ring {
     animation-duration: 2.4s;
   }
+
 }
 
 .viewport canvas {
