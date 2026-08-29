@@ -3,17 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>reBot Arm B601-RS · MuJoCo WASM M1</title>
+  <title>reBot Arm B601-RS · MuJoCo WASM M2</title>
   <link rel="stylesheet" href="/src/style.css">
 </head>
 <body>
   <main class="app">
     <section class="viewport" id="viewport"></section>
     <aside class="panel">
-      <p class="eyebrow">M1 运动学演示</p>
+      <p class="eyebrow">M2 物理演示</p>
       <h1>B601-RS MuJoCo WASM</h1>
       <p class="status" id="status">正在启动…</p>
-      <p class="hint">Mac 本地纯网页：滑块直接写 <code>qpos</code>，再 <code>mj_forward</code>。没有 ROS，也没有物理步进。</p>
+      <p class="hint">滑块只改 PD 目标，浏览器里 <code>mj_step</code>。手臂有惯性，色块会掉落。复位恢复姿态和物体。</p>
       <div class="button-row">
         <button type="button" id="reset">复位</button>
       </div>

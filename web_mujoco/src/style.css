@@ -95,9 +95,31 @@ button:hover {
 .joint label {
   display: flex;
   justify-content: space-between;
+  gap: 8px;
   font-size: 12px;
   margin-bottom: 4px;
   color: #b7c4bd;
+}
+
+.joint strong {
+  display: flex;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.joint .actual {
+  color: #e6ece8;
+}
+
+.joint .target-readout {
+  color: #8fd7c1;
+  font-weight: 500;
+}
+
+.joint .target-readout::before {
+  content: "目标 ";
+  color: #7d8a84;
+  font-weight: 400;
 }
 
 .joint input {

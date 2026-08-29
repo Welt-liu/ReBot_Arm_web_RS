@@ -9,6 +9,11 @@ export function createJointPanel(root, joints, onChange) {
     const name = document.createElement('span');
     name.textContent = joint.label;
     const value = document.createElement('strong');
+    const actualEl = document.createElement('span');
+    actualEl.className = 'actual';
+    const targetEl = document.createElement('span');
+    targetEl.className = 'target-readout';
+    value.append(actualEl, targetEl);
     label.append(name, value);
     const slider = document.createElement('input');
     slider.type = 'range';
@@ -18,10 +23,11 @@ export function createJointPanel(root, joints, onChange) {
     slider.value = String(joint.home);
     slider.addEventListener('input', () => {
       onChange(joint.name, Number(slider.value));
+      targetEl.textContent = format(joint, Number(slider.value));
     });
     wrap.append(label, slider);
     root.append(wrap);
-    sliders[joint.name] = { slider, value, joint };
+    sliders[joint.name] = { slider, actualEl, targetEl, joint };
   });
 
   function format(joint, amount) {
@@ -29,12 +35,25 @@ export function createJointPanel(root, joints, onChange) {
     return `${((amount * 180) / Math.PI).toFixed(1)}°`;
   }
 
+  function writeTarget(item, amount) {
+    item.slider.value = String(amount);
+    item.targetEl.textContent = format(item.joint, amount);
+  }
+
+  function writeActual(item, amount) {
+    item.actualEl.textContent = format(item.joint, amount);
+  }
+
   return {
-    set(name, amount) {
+    setTarget(name, amount) {
       const item = sliders[name];
       if (!item) return;
-      item.slider.value = String(amount);
-      item.value.textContent = format(item.joint, amount);
+      writeTarget(item, amount);
+    },
+    setActual(name, amount) {
+      const item = sliders[name];
+      if (!item) return;
+      writeActual(item, amount);
     }
   };
 }

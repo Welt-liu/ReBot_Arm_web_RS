@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Mac-local MuJoCo WASM kinematic demo for B601-RS",
+  "description": "Mac-local MuJoCo WASM physics demo for B601-RS",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5173",
     "build": "vite build",
