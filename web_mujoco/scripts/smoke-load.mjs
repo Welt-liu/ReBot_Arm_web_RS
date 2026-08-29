@@ -2,8 +2,9 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import loadMujoco from '@mujoco/mujoco';
-import { bindJoints } from '../src/kinematics.js';
+import { ARM_JOINTS, bindJoints } from '../src/kinematics.js';
 import { createPhysicsController } from '../src/pd-control.js';
+import { createTcpIk } from '../src/tcp-ik.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const modelsDir = path.resolve(here, '../../rebotarm_ros2/src/rebotarm_mujoco_rs/models');
@@ -49,6 +50,20 @@ async function main() {
   const { model, data, vfs } = await loadScene(mujoco);
   const joints = bindJoints(mujoco, model);
   const physics = createPhysicsController(mujoco, model, data, joints);
+  assert(Number.isInteger(joints.byName.joint2.id), '关节 id 无效');
+  assert(Number.isFinite(data.xanchor[joints.byName.joint2.id * 3]), 'xanchor 无法读取');
+
+  const ik = createTcpIk(mujoco, model, data, joints);
+  const tcp0 = ik.tcpPosition();
+  const ikAngles = Object.fromEntries(
+    ARM_JOINTS.map((joint) => [joint.name, data.qpos[joints.byName[joint.name].qposadr]])
+  );
+  const ikResult = ik.servoStep(
+    { x: tcp0.x + 0.03, y: tcp0.y, z: tcp0.z + 0.02 },
+    0.016,
+    ikAngles
+  );
+  assert(ikResult && Number.isFinite(ikResult.error), 'TCP IK servo 失败');
 
   data.ctrl[0] = 1.25;
   assert(Math.abs(data.ctrl[0] - 1.25) < 1e-9, 'data.ctrl 无法写入');

@@ -58,6 +58,10 @@ export function createPhysicsController(mujoco, model, data, joints) {
     }
   }
 
+  function setTargets(pose) {
+    Object.entries(pose).forEach(([name, value]) => setTarget(name, value));
+  }
+
   function applyCtrl() {
     for (const joint of arm) {
       const q = data.qpos[joint.qposadr];
@@ -89,5 +93,5 @@ export function createPhysicsController(mujoco, model, data, joints) {
     mujoco.mj_forward(model, data);
   }
 
-  return { targets, setTarget, step, reset };
+  return { targets, setTarget, setTargets, step, reset };
 }

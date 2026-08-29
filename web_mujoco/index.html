@@ -8,16 +8,30 @@
 </head>
 <body>
   <main class="app">
-    <section class="viewport" id="viewport"></section>
-    <aside class="panel">
-      <p class="eyebrow">M2 物理演示</p>
-      <h1>B601-RS MuJoCo WASM</h1>
-      <p class="status" id="status">正在启动…</p>
-      <p class="hint">滑块只改 PD 目标，浏览器里 <code>mj_step</code>。手臂有惯性，色块会掉落。复位恢复姿态和物体。</p>
-      <div class="button-row">
-        <button type="button" id="reset">复位</button>
+    <section class="viewport" id="viewport">
+      <div class="callouts" id="callouts"></div>
+      <div id="drag-cluster" class="drag-cluster">
+        <div id="drag-marker" class="drag-marker" data-i18n-title="marker.tcp" title="拖拽 TCP"></div>
+        <div class="gripper-fab">
+          <button type="button" id="gripper-open" data-i18n="btn.open">开</button>
+          <button type="button" id="gripper-close" data-i18n="btn.close">合</button>
+        </div>
       </div>
-      <div id="joints" class="joints"></div>
+    </section>
+    <aside class="panel">
+      <p class="eyebrow" data-i18n="panel.eyebrow">M2 物理演示</p>
+      <h1 data-i18n="panel.title">B601-RS MuJoCo WASM</h1>
+      <p class="status" id="status">正在启动…</p>
+      <p class="hint" data-i18n="panel.hint">点「启用 TCP 拖拽」会暂时关掉相机旋转。在画面上按住拖动即可移动末端；点旁开/合控制夹爪。</p>
+      <div class="button-row">
+        <button type="button" id="toggle-drag" data-i18n="btn.dragOn">启用 TCP 拖拽</button>
+        <button type="button" id="reset" data-i18n="btn.reset">复位</button>
+        <select id="lang-select" class="lang-select" aria-label="选择语言">
+          <option value="zh">🇨🇳 中文</option>
+          <option value="ja">🇯🇵 日本語</option>
+          <option value="en">🇬🇧 English</option>
+        </select>
+      </div>
     </aside>
   </main>
   <script type="module" src="/src/main.js"></script>

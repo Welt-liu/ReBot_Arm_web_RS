@@ -1,6 +1,6 @@
 :root {
   color-scheme: dark;
-  font-family: "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-family: "SF Pro Text", "PingFang SC", "Hiragino Sans", "Noto Sans JP", "Microsoft YaHei", sans-serif;
 }
 
 * {
@@ -17,7 +17,7 @@ body {
 
 .app {
   display: grid;
-  grid-template-columns: 1fr 320px;
+  grid-template-columns: 1fr 240px;
   height: 100%;
 }
 
@@ -28,9 +28,149 @@ body {
 }
 
 .viewport canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
   display: block;
   width: 100%;
   height: 100%;
+}
+
+.viewport.tcp-drag {
+  cursor: grab;
+  touch-action: none;
+}
+
+.viewport.tcp-dragging {
+  cursor: grabbing;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+  align-items: stretch;
+}
+
+.lang-select {
+  flex: 1 1 auto;
+  min-width: 120px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.2;
+  color: #e6ece8;
+  border: 1px solid #3b4a44;
+  border-radius: 8px;
+  background: #24302c;
+  cursor: pointer;
+}
+
+.lang-select:hover {
+  background: #2d3c37;
+}
+
+.lang-select:focus {
+  outline: 1px solid #8fd7c1;
+  border-color: #8fd7c1;
+}
+
+.viewport.tcp-drag .gripper-fab,
+.viewport.tcp-drag .gripper-fab button {
+  cursor: pointer;
+}
+
+.callouts {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.callout-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.callout-line {
+  fill: none;
+  stroke: var(--callout-color, #8fd7c1);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-opacity: 1;
+}
+
+.callout-dot {
+  fill: var(--callout-color, #8fd7c1);
+  stroke: #101418;
+  stroke-width: 1;
+}
+
+.callout-chip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 158px;
+  padding: 7px 9px 6px;
+  border: 1px solid var(--callout-color, #3b4a44);
+  border-radius: 10px;
+  background: rgba(22, 26, 24, 0.88);
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  touch-action: none;
+  user-select: none;
+}
+
+.callout-name {
+  color: var(--callout-color, #8fd7c1);
+  font-weight: 600;
+}
+
+.callout-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-size: 11px;
+  color: #b7c4bd;
+  white-space: nowrap;
+}
+
+.callout-header strong {
+  display: flex;
+  gap: 4px;
+  font-weight: 600;
+}
+
+.callout-chip .target-readout::before {
+  content: "/ ";
+  color: #7d8a84;
+  font-weight: 400;
+}
+
+.callout-chip.is-hidden {
+  visibility: hidden;
+}
+
+.callout-chip .actual {
+  color: #e6ece8;
+}
+
+.callout-chip .target-readout {
+  color: #8fd7c1;
+  font-weight: 500;
+}
+
+.callout-chip input {
+  width: 100%;
 }
 
 .panel {
@@ -70,8 +210,79 @@ code {
   color: #d7fff4;
 }
 
-.button-row {
-  margin-bottom: 16px;
+button.active {
+  border-color: #8fd7c1;
+  background: #2d4a43;
+}
+
+.drag-cluster {
+  position: absolute;
+  z-index: 8;
+  display: none;
+  align-items: center;
+  gap: 52px;
+  pointer-events: none;
+  transform: translate(-14px, -50%);
+}
+
+.drag-cluster.active {
+  display: flex;
+}
+
+.drag-cluster.flip-x {
+  flex-direction: row-reverse;
+  transform: translate(calc(-100% + 14px), -50%);
+}
+
+.drag-marker {
+  position: relative;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  border: 2px solid rgba(51, 214, 176, 0.95);
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(51, 214, 176, 0.92) 0 24%, rgba(51, 214, 176, 0.2) 26% 60%, transparent 62%);
+  box-shadow: 0 0 18px rgba(51, 214, 176, 0.75);
+  pointer-events: none;
+}
+
+.drag-marker.dragging {
+  border-color: rgba(242, 165, 65, 0.98);
+  box-shadow: 0 0 20px rgba(242, 165, 65, 0.72);
+}
+
+.gripper-fab {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid rgba(212, 179, 255, 0.7);
+  border-radius: 10px;
+  background: rgba(22, 26, 24, 0.92);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
+  pointer-events: auto;
+}
+
+.gripper-fab button {
+  min-width: 44px;
+  padding: 5px 10px;
+  font-size: 12px;
+  line-height: 1.2;
+  border-color: #6b5a88;
+  background: rgba(28, 24, 36, 0.92);
+  color: #d4b3ff;
+  touch-action: none;
+}
+
+.gripper-fab button:hover {
+  background: #3a3348;
+}
+
+.gripper-fab button.active {
+  border-color: #d4b3ff;
+  background: #3d3352;
 }
 
 button {
@@ -85,45 +296,6 @@ button {
 
 button:hover {
   background: #2d3c37;
-}
-
-.joints {
-  display: grid;
-  gap: 12px;
-}
-
-.joint label {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 12px;
-  margin-bottom: 4px;
-  color: #b7c4bd;
-}
-
-.joint strong {
-  display: flex;
-  gap: 8px;
-  font-weight: 600;
-}
-
-.joint .actual {
-  color: #e6ece8;
-}
-
-.joint .target-readout {
-  color: #8fd7c1;
-  font-weight: 500;
-}
-
-.joint .target-readout::before {
-  content: "目标 ";
-  color: #7d8a84;
-  font-weight: 400;
-}
-
-.joint input {
-  width: 100%;
 }
 
 @media (max-width: 900px) {

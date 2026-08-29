@@ -147,7 +147,14 @@ export function createSceneView(host) {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.shadowMap.enabled = true;
+  renderer.domElement.style.zIndex = '0';
   host.appendChild(renderer.domElement);
+  ['callouts', 'drag-cluster'].forEach((id) => {
+    const node = host.querySelector(`#${id}`);
+    if (node) host.appendChild(node);
+  });
+
+  const ndc = new THREE.Vector3();
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.target.set(0.28, 0, 0.16);
@@ -159,6 +166,35 @@ export function createSceneView(host) {
   key.castShadow = true;
   scene.add(key);
   scene.add(new THREE.HemisphereLight(0x9ecbff, 0x2a2f2c, 0.35));
+
+  const tcpMarker = new THREE.Mesh(
+    new THREE.SphereGeometry(0.02, 24, 16),
+    new THREE.MeshStandardMaterial({
+      color: 0x33d6b0,
+      emissive: 0x0a4d3d,
+      emissiveIntensity: 1.2
+    })
+  );
+  tcpMarker.visible = false;
+  scene.add(tcpMarker);
+
+  const targetGhost = new THREE.Mesh(
+    new THREE.SphereGeometry(0.018, 28, 18),
+    new THREE.MeshBasicMaterial({ color: 0xf2a541, transparent: true, opacity: 0.85 })
+  );
+  targetGhost.visible = false;
+  scene.add(targetGhost);
+
+  const dragErrorLine = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
+    new THREE.LineBasicMaterial({ color: 0xff6b5f, transparent: true, opacity: 0.82 })
+  );
+  dragErrorLine.visible = false;
+  scene.add(dragErrorLine);
+
+  const raycaster = new THREE.Raycaster();
+  const ndcMouse = new THREE.Vector2();
+  const planeHit = new THREE.Vector3();
 
   const meshes = [];
   const meshGeometries = new Map();
@@ -210,6 +246,43 @@ export function createSceneView(host) {
     renderer.render(scene, camera);
   }
 
+  function projectWorld(x, y, z) {
+    ndc.set(x, y, z).project(camera);
+    const width = Math.max(1, host.clientWidth);
+    const height = Math.max(1, host.clientHeight);
+    return {
+      x: (ndc.x * 0.5 + 0.5) * width,
+      y: (-ndc.y * 0.5 + 0.5) * height,
+      visible: ndc.z > -1 && ndc.z < 1 && ndc.x > -1.35 && ndc.x < 1.35
+    };
+  }
+
+  function intersectPlane(clientX, clientY, plane) {
+    const rect = host.getBoundingClientRect();
+    ndcMouse.set(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1
+    );
+    raycaster.setFromCamera(ndcMouse, camera);
+    return raycaster.ray.intersectPlane(plane, planeHit) ? planeHit.clone() : null;
+  }
+
+  function setOrbitEnabled(enabled) {
+    controls.enabled = enabled;
+  }
+
+  function setDragVisuals({ tcp, target, dragMode, dragging }) {
+    tcpMarker.visible = Boolean(dragMode && tcp);
+    if (tcp) tcpMarker.position.set(tcp.x, tcp.y, tcp.z);
+    targetGhost.visible = Boolean(dragMode && dragging && target);
+    if (target) targetGhost.position.set(target.x, target.y, target.z);
+    const showLine = Boolean(dragMode && dragging && tcp && target && tcp.distanceTo(target) > 0.001);
+    dragErrorLine.visible = showLine;
+    if (showLine) {
+      dragErrorLine.geometry.setFromPoints([tcp, target]);
+    }
+  }
+
   function clear() {
     meshes.forEach((mesh) => {
       scene.remove(mesh);
@@ -229,6 +302,11 @@ export function createSceneView(host) {
     sync,
     render,
     resize,
+    projectWorld,
+    intersectPlane,
+    setOrbitEnabled,
+    setDragVisuals,
+    camera,
     dispose() {
       observer.disconnect();
       clear();

@@ -1,3 +1,5 @@
+import { t } from './i18n.js';
+
 const MODEL_DIR = `${import.meta.env.BASE_URL}models`;
 const SCENE_XML = 'rs_grasp_scene.xml';
 
@@ -79,10 +81,10 @@ export async function loadRsScene(mujoco, onProgress) {
       const relative = queue.shift();
       if (seen.has(relative)) continue;
       seen.add(relative);
-      onProgress?.(`正在下载 ${relative}`);
+      onProgress?.(t('status.download', { file: relative }));
       const bytes = await fetchBytes(`${MODEL_DIR}/${relative}`, (received, total) => {
-        const suffix = total ? ` ${(received / 1048576).toFixed(1)} / ${(total / 1048576).toFixed(1)} MB` : '';
-        onProgress?.(`正在下载 ${relative}${suffix}`);
+        const mb = total ? `${(received / 1048576).toFixed(1)} / ${(total / 1048576).toFixed(1)} MB` : '';
+        onProgress?.(t('status.downloadProgress', { file: relative, mb }));
       });
       files[relative] = bytes;
       addToVfs(vfs, relative, bytes);
@@ -95,7 +97,7 @@ export async function loadRsScene(mujoco, onProgress) {
       }
     }
 
-    onProgress?.(`资源已写入 MjVFS（${(loadedBytes / 1048576).toFixed(1)} MB），正在编译模型`);
+    onProgress?.(t('status.compiling', { mb: (loadedBytes / 1048576).toFixed(1) }));
     const model = createModel(mujoco, files[SCENE_XML], vfs);
     const data = new mujoco.MjData(model);
     mujoco.mj_forward(model, data);
