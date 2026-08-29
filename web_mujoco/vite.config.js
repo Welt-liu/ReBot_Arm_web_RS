@@ -1,5 +1,5 @@
-import { cpSync, existsSync, mkdirSync } from 'node:fs';
-import { createReadStream, statSync } from 'node:fs';
+import { cpSync, createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
@@ -11,6 +11,27 @@ const modelsSrc = path.resolve(
 );
 const modelsSrcAbs = path.resolve(modelsSrc);
 
+function collectFiles(dir) {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const fullPath = path.join(dir, entry.name);
+    return entry.isDirectory() ? collectFiles(fullPath) : [fullPath];
+  });
+}
+
+function hashModelFiles() {
+  if (!existsSync(modelsSrcAbs)) return 'missing';
+  const hash = createHash('sha256');
+  collectFiles(modelsSrcAbs)
+    .sort()
+    .forEach((filePath) => {
+      hash.update(path.relative(modelsSrcAbs, filePath).replaceAll(path.sep, '/'));
+      hash.update(readFileSync(filePath));
+    });
+  return hash.digest('hex').slice(0, 12);
+}
+
+const modelVersion = hashModelFiles();
+
 function pagesBase() {
   const value = process.env.GITHUB_PAGES_BASE;
   if (!value) return '/';
@@ -19,6 +40,9 @@ function pagesBase() {
 
 export default defineConfig({
   base: pagesBase(),
+  define: {
+    __MODEL_VERSION__: JSON.stringify(modelVersion)
+  },
   optimizeDeps: {
     exclude: ['@mujoco/mujoco']
   },

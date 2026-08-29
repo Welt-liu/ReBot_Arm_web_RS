@@ -6,6 +6,7 @@ import { createJointCallouts } from './ui.js';
 import { createTcpIk } from './tcp-ik.js';
 import { createTcpDrag } from './tcp-drag.js';
 import { t, bindLangSwitch, applyStaticI18n, onLangChange } from './i18n.js';
+import { persistAppShell } from './register-service-worker.js';
 
 const statusEl = document.getElementById('status');
 const calloutsEl = document.getElementById('callouts');
@@ -45,6 +46,7 @@ function setLoadProgress(progress) {
 function finishLoading() {
   loadingComplete = true;
   loadingOverlayEl?.classList.add('is-hidden');
+  void persistAppShell();
 }
 
 renderLoadProgress();

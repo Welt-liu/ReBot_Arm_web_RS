@@ -1,6 +1,11 @@
 const MODEL_DIR = `${import.meta.env.BASE_URL}models`;
 const SCENE_XML = 'rs_grasp_scene.xml';
 const DOWNLOAD_CONCURRENCY = 6;
+const MODEL_VERSION = typeof __MODEL_VERSION__ === 'undefined' ? 'dev' : __MODEL_VERSION__;
+
+function modelUrl(relative) {
+  return `${MODEL_DIR}/${relative}?v=${MODEL_VERSION}`;
+}
 
 export async function loadMujocoModule() {
   const loadMujoco = (await import('@mujoco/mujoco')).default;
@@ -117,7 +122,7 @@ export async function loadRsScene(mujoco, onProgress) {
       if (seen.has(relative)) continue;
       seen.add(relative);
       report(onProgress, 'status.download', { file: relative });
-      const bytes = await fetchBytes(`${MODEL_DIR}/${relative}`, (received, total) => {
+      const bytes = await fetchBytes(modelUrl(relative), (received, total) => {
         const mb = total ? `${(received / 1048576).toFixed(1)} / ${(total / 1048576).toFixed(1)} MB` : '';
         report(onProgress, 'status.downloadProgress', { file: relative, mb });
       });
@@ -161,7 +166,7 @@ export async function loadRsScene(mujoco, onProgress) {
         seen.add(relative);
         activeBytes.set(relative, 0);
         reportAssetProgress(true);
-        const bytes = await fetchBytes(`${MODEL_DIR}/${relative}`, (received) => {
+        const bytes = await fetchBytes(modelUrl(relative), (received) => {
           activeBytes.set(relative, received);
           reportAssetProgress();
         });

@@ -1,7 +1,7 @@
 {
   "panel.eyebrow": "M2 物理演示",
   "panel.title": "B601-RS MuJoCo WASM",
-  "panel.hint": "点「启用 TCP 拖拽」会暂时关掉相机旋转。在画面上按住拖动即可移动末端；点旁开/合控制夹爪。",
+  "panel.hint": "在画面上按住 TCP 标记拖动即可移动末端；点旁边的开/合控制夹爪。",
   "loading.title": "正在构建数字孪生",
   "status.booting": "正在启动…",
   "status.download": "正在下载 {file}",
@@ -12,7 +12,7 @@
   "status.compiled": "模型已编译（ngeom={ngeom}），正在构建 Three.js 网格…",
   "status.ready": "已加载 {n} 个资源。可启用 TCP 拖拽；滑块只改 PD 目标。",
   "status.fail": "启动失败：{error}",
-  "status.dragOn": "相机旋转已关闭，在画面上拖动末端；点旁开/合控制夹爪",
+  "status.dragOn": "在画面上拖动 TCP 标记移动末端；点旁边的开/合控制夹爪",
   "status.dragOff": "TCP 拖拽未启用",
   "status.gripperOpen": "夹爪打开 {mm} mm",
   "status.gripperClose": "夹爪闭合",

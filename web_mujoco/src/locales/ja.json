@@ -1,7 +1,7 @@
 {
   "panel.eyebrow": "M2 物理デモ",
   "panel.title": "B601-RS MuJoCo WASM",
-  "panel.hint": "「TCP ドラッグ」を有効にするとカメラ回転がオフになります。画面をドラッグして先端を動かし、横の開/閉でグリッパを操作します。",
+  "panel.hint": "TCP マーカーを押したままドラッグして先端を動かし、横の開/閉でグリッパを操作します。",
   "loading.title": "デジタルツインを構築中",
   "status.booting": "起動中…",
   "status.download": "{file} をダウンロード中",
@@ -12,7 +12,7 @@
   "status.compiled": "モデルをコンパイルしました（ngeom={ngeom}）。Three.js メッシュを構築中…",
   "status.ready": "{n} 個のリソースを読み込みました。TCP ドラッグを有効にできます。スライダーは PD 目標のみ変更します。",
   "status.fail": "起動に失敗しました：{error}",
-  "status.dragOn": "カメラ回転オフ。画面をドラッグして先端を移動。横の開/閉でグリッパ操作",
+  "status.dragOn": "TCP マーカーをドラッグして先端を移動。横の開/閉でグリッパ操作",
   "status.dragOff": "TCP ドラッグは無効",
   "status.gripperOpen": "グリッパ開 {mm} mm",
   "status.gripperClose": "グリッパ閉",

@@ -1,7 +1,7 @@
 {
   "panel.eyebrow": "M2 Physics Demo",
   "panel.title": "B601-RS MuJoCo WASM",
-  "panel.hint": "Enable TCP drag to lock camera orbit. Drag on the view to move the tip; use Open/Close beside it for the gripper.",
+  "panel.hint": "Hold and drag the TCP marker to move the tip; use Open/Close beside it for the gripper.",
   "loading.title": "Building digital twin",
   "status.booting": "Starting…",
   "status.download": "Downloading {file}",
@@ -12,7 +12,7 @@
   "status.compiled": "Model compiled (ngeom={ngeom}), building Three.js meshes…",
   "status.ready": "Loaded {n} assets. Enable TCP drag; sliders change PD targets only.",
   "status.fail": "Startup failed: {error}",
-  "status.dragOn": "Camera orbit locked. Drag to move the tip; Open/Close beside it controls the gripper",
+  "status.dragOn": "Drag the TCP marker to move the tip; Open/Close beside it controls the gripper",
   "status.dragOff": "TCP drag is off",
   "status.gripperOpen": "Gripper open {mm} mm",
   "status.gripperClose": "Gripper closed",
