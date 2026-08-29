@@ -80,6 +80,7 @@ export function createJointCallouts(root, joints, onChange) {
     body.append(slider);
     chip.addEventListener('pointerdown', (event) => event.stopPropagation());
     chip.addEventListener('mouseenter', () => {
+      if (isTcpBusy()) return;
       if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
       setOpen(chip, true);
     });
@@ -89,6 +90,7 @@ export function createJointCallouts(root, joints, onChange) {
     });
     chip.addEventListener('click', (event) => {
       if (event.target.closest('input')) return;
+      if (isTcpBusy()) return;
       if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
       setOpen(chip, !chip.classList.contains('is-open'));
     });
@@ -124,6 +126,11 @@ export function createJointCallouts(root, joints, onChange) {
 
   function invalidateLayout() {
     placedWidth = -1;
+  }
+
+  function isTcpBusy() {
+    const host = root.parentElement;
+    return Boolean(host && host.classList.contains('tcp-dragging'));
   }
 
   function setOpen(chip, open) {
@@ -232,6 +239,7 @@ export function createJointCallouts(root, joints, onChange) {
 
   return {
     layout,
+    closeChips: closeOpenChips,
     applyLang() {
       const gripper = chips.joint7;
       if (gripper) {

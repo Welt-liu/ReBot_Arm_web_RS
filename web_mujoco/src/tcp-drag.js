@@ -101,6 +101,7 @@ export function createTcpDrag({
     enabled = next;
     dragging = false;
     settling = false;
+    panel.closeChips();
     toggleEl.classList.toggle('active', enabled);
     toggleEl.textContent = t(enabled ? 'btn.dragOff' : 'btn.dragOn');
     markerEl.classList.remove('dragging');
@@ -128,12 +129,13 @@ export function createTcpDrag({
     event.stopPropagation();
     dragging = true;
     settling = false;
+    applyOrbitLock();
+    panel.closeChips();
     lastTime = performance.now();
     ikAngles = captureAngles();
     target.copy(tcpVec());
     view.camera.getWorldDirection(cameraDir);
     plane.setFromNormalAndCoplanarPoint(cameraDir, target);
-    applyOrbitLock();
     markerEl.classList.add('dragging');
     hostEl.setPointerCapture(event.pointerId);
   }
