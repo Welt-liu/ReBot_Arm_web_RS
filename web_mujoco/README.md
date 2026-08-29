@@ -1,0 +1,95 @@
+# web_mujoco
+
+Mac 上的纯网页 MuJoCo WASM 演示：用官方 `@mujoco/mujoco` 在浏览器里加载
+`rs_grasp_scene.xml`。不启动 ROS、不连真机。
+
+当前完成到 **M2**（物理步进）。抓取见下方里程碑。
+
+## 环境
+
+- macOS，Node.js 18+
+- Chrome 或 Edge
+
+## 启动
+
+```bash
+cd web_mujoco
+npm install
+npm run dev
+```
+
+打开 [http://127.0.0.1:5173](http://127.0.0.1:5173)。首次会下载约 62 MB STL，之后走浏览器缓存。
+
+本地校验物理（不需要浏览器）：
+
+```bash
+npm run smoke
+```
+
+## GitHub Pages
+
+推送到 `main` 或 `feat/web-mujoco-m1` 后，Actions 会构建并发布静态站。仓库需在
+**Settings → Pages → Source** 选择 **GitHub Actions**（只需设一次）。
+
+地址为：
+
+`https://<owner>.github.io/ReBot_Arm_web_RS/`
+
+首次打开会下载全部网格，请用 Chrome 或 Edge。
+
+本地预览生产包：
+
+```bash
+cd web_mujoco
+GITHUB_PAGES_BASE=/ReBot_Arm_web_RS/ npm run build
+npx vite preview
+```
+
+## 里程碑（M1–M4）
+
+| 里程碑 | 内容 | 状态 |
+|---|---|---|
+| **M1** | RS 臂运动学 | 已完成 |
+| **M2** | 物理步进 | 已完成 |
+| **M3** | 页内抓取 | 未做 |
+| **M4** | 俯视相机（可选） | 未做 |
+
+M0（空场景验证 WASM）已跳过，直接加载 RS 抓取场景。
+
+### M1 运动学（已完成）
+
+加载 `rs_grasp_scene.xml`，滑块直接写 `qpos`，再调用 `mj_forward`。没有 `mj_step`。
+
+验收：
+
+- 手臂、桌面、红/蓝/黄物体可见
+- J1–J6 连续转动，模型不瞬移（运动学直连）
+- 夹爪滑块同时驱动 `joint7` / `joint_left` / `joint_right`
+- 复位回到零位
+
+### M2 物理（已完成）
+
+接上与 `mujoco_sync.py` 对齐的 PD：滑块只改目标，`mj_step` 驱动 `<motor>`。物体可被推倒、掉落。提供 Reset。
+
+显示约 60 Hz，每帧 4 步（`timestep=0.001`，等效约 240 Hz）。
+
+验收：
+
+- 拖 joint2 时手臂有惯性，不瞬移
+- 色块受重力，可被碰到
+- Reset 回到初始姿态与物体位置
+
+这步之后才算浏览器里代替了原生 MuJoCo 仿真本体。
+
+### M3 页内抓取
+
+读 `red_cube` / `blue_block` / `yellow_cylinder` 的 `xpos`，用简化笛卡尔接近（固定姿态 + 位置 IK，或写死关节路点）：开爪 → 到上方 → 下探 → 闭合 → 抬升。
+
+验收：
+
+- 点击抓取后物体 `z` 升高
+- 不依赖 ROS 视觉话题；成功判据来自 MuJoCo body 位姿
+
+### M4 俯视相机（可选）
+
+用场景里的 `overhead_rgb` 离屏渲染到侧栏小 canvas。颜色检测仍读 body 位姿，不必做 OpenCV。

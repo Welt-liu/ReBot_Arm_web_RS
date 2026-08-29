@@ -9,3 +9,6 @@ rebotarm_ros2_RS/.venv/
 **/*.pyc
 reBotArm_simulator-RS/.certs/
 reBotArm_simulator-RS/.env
+web_mujoco/node_modules/
+web_mujoco/dist/
+.vite/
