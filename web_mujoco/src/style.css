@@ -125,6 +125,7 @@ body {
 }
 
 .viewport.tcp-dragging {
+  touch-action: none;
 }
 
 .button-row {
@@ -375,6 +376,10 @@ button.active {
   box-shadow: 0 0 18px rgba(51, 214, 176, 0.75);
   pointer-events: auto;
   cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .drag-marker.dragging {
@@ -455,5 +460,32 @@ button:hover {
   .callout-chip.is-open .target-readout,
   .callout-chip:focus-within .target-readout {
     display: none;
+  }
+
+  html.tcp-touch-dragging,
+  body.tcp-touch-dragging {
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  .viewport.tcp-touch-dragging,
+  .viewport.tcp-touch-dragging canvas {
+    touch-action: none;
+    overscroll-behavior: none;
+  }
+
+  .drag-cluster {
+    gap: 40px;
+    transform: translate(-22px, -50%);
+  }
+
+  .drag-cluster.flip-x {
+    transform: translate(calc(-100% + 22px), -50%);
+  }
+
+  .drag-marker {
+    flex-basis: 44px;
+    width: 44px;
+    height: 44px;
   }
 }

@@ -7,6 +7,8 @@ const SETTLE_TIMEOUT_MS = 900;
 const GRIPPER_OPEN = GRIPPER_JOINTS[0].max;
 const GRIPPER_CLOSE = 0;
 const FAB_CLEARANCE = 160;
+const TOUCH_SERVO_SPEEDUP = 1.65;
+const TOUCH_STATUS_INTERVAL_MS = 90;
 
 export function createTcpDrag({
   view,
@@ -30,6 +32,10 @@ export function createTcpDrag({
   let lastTime = 0;
   let settleStart = 0;
   let ikAngles = {};
+  let activePointerId = null;
+  let touchDragging = false;
+  let targetClamped = false;
+  let lastStatusTime = 0;
 
   function syncTargets(angles) {
     ik.armNames.forEach((name) => {
@@ -82,10 +88,14 @@ export function createTcpDrag({
     view.setOrbitEnabled(!(enabled && dragging));
     hostEl.classList.toggle('tcp-drag', enabled);
     hostEl.classList.toggle('tcp-dragging', dragging);
+    hostEl.classList.toggle('tcp-touch-dragging', dragging && touchDragging);
+    document.documentElement.classList.toggle('tcp-touch-dragging', dragging && touchDragging);
+    document.body.classList.toggle('tcp-touch-dragging', dragging && touchDragging);
   }
 
   function servoToward(now) {
-    const dt = Math.min(0.05, Math.max(0.012, (now - lastTime) / 1000 || 0.016));
+    const elapsed = Math.max(0.012, (now - lastTime) / 1000 || 0.016);
+    const dt = Math.min(0.05, elapsed * (touchDragging ? TOUCH_SERVO_SPEEDUP : 1));
     lastTime = now;
     const substeps = Math.max(1, Math.ceil(dt / 0.016));
     let result = null;
@@ -100,6 +110,8 @@ export function createTcpDrag({
     enabled = next;
     dragging = false;
     settling = false;
+    activePointerId = null;
+    touchDragging = false;
     panel.closeChips();
     toggleEl.classList.toggle('active', enabled);
     toggleEl.textContent = t(enabled ? 'btn.dragOff' : 'btn.dragOn');
@@ -123,6 +135,10 @@ export function createTcpDrag({
     event.preventDefault();
     event.stopPropagation();
     dragging = true;
+    activePointerId = event.pointerId;
+    touchDragging = event.pointerType === 'touch';
+    targetClamped = false;
+    lastStatusTime = 0;
     settling = false;
     applyOrbitLock();
     panel.closeChips();
@@ -132,14 +148,22 @@ export function createTcpDrag({
     view.camera.getWorldDirection(cameraDir);
     plane.setFromNormalAndCoplanarPoint(cameraDir, target);
     markerEl.classList.add('dragging');
-    markerEl.setPointerCapture(event.pointerId);
+    try {
+      markerEl.setPointerCapture(event.pointerId);
+    } catch {
+      // Some mobile browsers already own the pointer capture at this stage.
+    }
   }
 
   function onPointerMove(event) {
-    if (!dragging) return;
-    const hit = view.intersectPlane(event.clientX, event.clientY, plane);
+    if (!dragging || event.pointerId !== activePointerId) return;
+    if (event.cancelable) event.preventDefault();
+    const samples = typeof event.getCoalescedEvents === 'function' ? event.getCoalescedEvents() : [];
+    const sample = samples.length ? samples[samples.length - 1] : event;
+    const hit = view.intersectPlane(sample.clientX, sample.clientY, plane);
     if (!hit) return;
     const bounded = ik.clampToWorkspace(hit);
+    targetClamped = bounded.clamped;
     target.set(bounded.point.x, bounded.point.y, bounded.point.z);
     const result = servoToward(performance.now());
     const tcp = tcpVec();
@@ -151,13 +175,15 @@ export function createTcpDrag({
   }
 
   function onPointerUp(event) {
-    if (!dragging) return;
+    if (!dragging || (event.pointerId != null && event.pointerId !== activePointerId)) return;
     dragging = false;
     markerEl.classList.remove('dragging');
-    if (markerEl.hasPointerCapture(event.pointerId)) {
-      markerEl.releasePointerCapture(event.pointerId);
+    if (activePointerId != null && markerEl.hasPointerCapture(activePointerId)) {
+      markerEl.releasePointerCapture(activePointerId);
     }
     applyOrbitLock();
+    activePointerId = null;
+    touchDragging = false;
     const tcp = tcpVec();
     if (tcp.distanceTo(target) > SETTLE_ERROR) {
       settling = true;
@@ -172,10 +198,21 @@ export function createTcpDrag({
   }
 
   function update(now) {
-    const tcp = tcpVec();
+    let tcp = tcpVec();
     if (!enabled) {
       view.setDragVisuals({ tcp, target, dragMode: false, dragging: false });
       updateMarker(null);
+      return;
+    }
+    if (dragging && touchDragging) {
+      const result = servoToward(now);
+      tcp = tcpVec();
+      view.setDragVisuals({ tcp, target, dragMode: true, dragging: true });
+      updateMarker(target);
+      if (result && now - lastStatusTime >= TOUCH_STATUS_INTERVAL_MS) {
+        lastStatusTime = now;
+        onStatus(`${targetClamped ? t('status.clamped') : ''}${t('status.error', { mm: (result.error * 1000).toFixed(1) })}`);
+      }
       return;
     }
     if (settling && !dragging) {
@@ -206,6 +243,8 @@ export function createTcpDrag({
   function stop() {
     dragging = false;
     settling = false;
+    activePointerId = null;
+    touchDragging = false;
     markerEl.classList.remove('dragging');
     applyOrbitLock();
     if (enabled) {
@@ -234,13 +273,23 @@ export function createTcpDrag({
     });
   }
 
+  function preventTouchNavigation(event) {
+    if (dragging && touchDragging && event.cancelable) event.preventDefault();
+  }
+
+  function preventTouchStart(event) {
+    if (enabled && event.cancelable) event.preventDefault();
+  }
+
   toggleEl.addEventListener('click', () => setEnabled(!enabled));
   bindGripperButton(openEl, GRIPPER_OPEN);
   bindGripperButton(closeEl, GRIPPER_CLOSE);
-  markerEl.addEventListener('pointerdown', onPointerDown);
-  window.addEventListener('pointermove', onPointerMove);
+  markerEl.addEventListener('pointerdown', onPointerDown, { passive: false });
+  markerEl.addEventListener('touchstart', preventTouchStart, { passive: false });
+  window.addEventListener('pointermove', onPointerMove, { passive: false });
   window.addEventListener('pointerup', onPointerUp);
   window.addEventListener('pointercancel', onPointerUp);
+  window.addEventListener('touchmove', preventTouchNavigation, { passive: false });
   onLangChange(applyLang);
 
   return {
