@@ -72,7 +72,7 @@ function primitiveGeometry(type, size, types) {
     return new THREE.SphereGeometry(size[0], 24, 16);
   }
   if (type === types.capsule) {
-    const geometry = new THREE.CapsuleGeometry(size[0], 2 * size[2], 8, 16);
+    const geometry = new THREE.CapsuleGeometry(size[0], 2 * size[1], 8, 16);
     geometry.rotateX(Math.PI / 2);
     return geometry;
   }
@@ -82,7 +82,7 @@ function primitiveGeometry(type, size, types) {
     return geometry;
   }
   if (type === types.cylinder) {
-    const geometry = new THREE.CylinderGeometry(size[0], size[0], 2 * size[2], 24);
+    const geometry = new THREE.CylinderGeometry(size[0], size[0], 2 * size[1], 24);
     geometry.rotateX(Math.PI / 2);
     return geometry;
   }
@@ -105,13 +105,24 @@ function geomMaterial(model, index) {
       color = new THREE.Color(matRgba[0], matRgba[1], matRgba[2]);
       opacity = matRgba[3];
     }
-    if (model.mat_metallic) metalness = model.mat_metallic[matid];
-    if (model.mat_roughness) roughness = model.mat_roughness[matid];
+    if (model.mat_metallic) {
+      metalness = model.mat_metallic[matid];
+    } else if (model.mat_specular) {
+      // MuJoCo stores metallic/roughness as custom XML attrs that the
+      // compiler ignores. Derive PBR from specular (RGB avg) and shininess.
+      const spec = model.mat_specular.subarray(matid * 4, matid * 4 + 4);
+      metalness = (spec[0] + spec[1] + spec[2]) / 3;
+    }
+    if (model.mat_roughness) {
+      roughness = model.mat_roughness[matid];
+    } else if (model.mat_shininess) {
+      roughness = 1 - model.mat_shininess[matid];
+    }
   }
   return new THREE.MeshStandardMaterial({
     color,
-    metalness: Number.isFinite(metalness) ? metalness : 0.12,
-    roughness: Number.isFinite(roughness) ? roughness : 0.55,
+    metalness: Number.isFinite(metalness) ? Math.max(0, Math.min(1, metalness)) : 0.12,
+    roughness: Number.isFinite(roughness) ? Math.max(0, Math.min(1, roughness)) : 0.55,
     transparent: opacity < 0.999,
     opacity,
     side: THREE.DoubleSide
