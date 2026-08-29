@@ -148,6 +148,43 @@ function setPose(mesh, xpos, xmat, index) {
   mesh.matrixWorldNeedsUpdate = true;
 }
 
+function createGridTexture() {
+  const size = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#0a1530';
+  ctx.fillRect(0, 0, size, size);
+
+  const glow = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size * 0.7);
+  glow.addColorStop(0, 'rgba(25, 70, 130, 0.18)');
+  glow.addColorStop(1, 'rgba(10, 21, 48, 0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, size, size);
+
+  const sub = 4;
+  ctx.strokeStyle = 'rgba(30, 90, 160, 0.35)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 1; i < sub; i += 1) {
+    const p = (i / sub) * size;
+    ctx.moveTo(p, 0); ctx.lineTo(p, size);
+    ctx.moveTo(0, p); ctx.lineTo(size, p);
+  }
+  ctx.stroke();
+
+  ctx.strokeStyle = 'rgba(80, 170, 255, 0.85)';
+  ctx.lineWidth = 2.5;
+  ctx.strokeRect(0, 0, size, size);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(6, 6);
+  texture.anisotropy = 4;
+  return texture;
+}
+
 export function createSceneView(host) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x101418);
@@ -201,11 +238,12 @@ export function createSceneView(host) {
   scene.add(fill);
 
   const tcpMarker = new THREE.Mesh(
-    new THREE.SphereGeometry(0.02, 24, 16),
-    new THREE.MeshStandardMaterial({
+    new THREE.SphereGeometry(0.024, 16, 12),
+    new THREE.MeshBasicMaterial({
       color: 0x33d6b0,
-      emissive: 0x0a4d3d,
-      emissiveIntensity: 1.2
+      wireframe: true,
+      transparent: true,
+      opacity: 0.4
     })
   );
   tcpMarker.visible = false;
@@ -231,6 +269,7 @@ export function createSceneView(host) {
 
   const meshes = [];
   const meshGeometries = new Map();
+  let gridTexture = null;
   let types = geomTypes({});
 
   function resize() {
@@ -259,7 +298,18 @@ export function createSceneView(host) {
         geometry = primitiveGeometry(type, size, types);
       }
       if (!geometry) continue;
-      const mesh = new THREE.Mesh(geometry, geomMaterial(model, i));
+      let material;
+      if (type === types.plane) {
+        if (!gridTexture) gridTexture = createGridTexture();
+        material = new THREE.MeshStandardMaterial({
+          map: gridTexture,
+          metalness: 0.15,
+          roughness: 0.72
+        });
+      } else {
+        material = geomMaterial(model, i);
+      }
+      const mesh = new THREE.Mesh(geometry, material);
       mesh.castShadow = type !== types.plane;
       mesh.receiveShadow = true;
       mesh.userData.geomIndex = i;
@@ -343,6 +393,7 @@ export function createSceneView(host) {
     dispose() {
       observer.disconnect();
       clear();
+      if (gridTexture) { gridTexture.dispose(); gridTexture = null; }
       controls.dispose();
       renderer.dispose();
       renderer.domElement.remove();
