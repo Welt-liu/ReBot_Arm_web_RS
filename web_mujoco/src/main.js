@@ -48,6 +48,8 @@ let visualProgress = 0;
 let visualProgressTarget = 0;
 let visualProgressFrame = 0;
 let visualProgressQueue = Promise.resolve();
+let visualProgressCreepFrame = 0;
+let visualProgressCreepActive = false;
 
 function renderVisualProgress(value) {
   const rounded = Math.round(value);
@@ -86,6 +88,32 @@ function setVisualProgress(next) {
   return visualProgressQueue;
 }
 
+function stopVisualProgressCreep() {
+  visualProgressCreepActive = false;
+  cancelAnimationFrame(visualProgressCreepFrame);
+}
+
+function startVisualProgressCreep() {
+  if (visualProgressCreepActive) return;
+  visualProgressCreepActive = true;
+
+  void visualProgressQueue.then(() => {
+    if (!visualProgressCreepActive || visualProgressTarget > 69) return;
+    const start = visualProgress;
+    const startedAt = performance.now();
+
+    const creep = (now) => {
+      if (!visualProgressCreepActive || visualProgressTarget > 69) return;
+      const elapsedSeconds = Math.max(0, now - startedAt) / 1000;
+      visualProgress = Math.min(88, Math.max(visualProgress, start + elapsedSeconds * 0.7));
+      renderVisualProgress(visualProgress);
+      visualProgressCreepFrame = requestAnimationFrame(creep);
+    };
+
+    visualProgressCreepFrame = requestAnimationFrame(creep);
+  });
+}
+
 function renderLoadProgress() {
   const text = t(loadProgress.key, loadProgress.vars);
   setStatus(text);
@@ -94,12 +122,20 @@ function renderLoadProgress() {
 
 function setLoadProgress(progress) {
   loadProgress = typeof progress === 'string' ? { key: progress, vars: {} } : progress;
-  setVisualProgress(LOAD_STAGE_PROGRESS[loadProgress.key] ?? visualProgressTarget);
+  const nextProgress = LOAD_STAGE_PROGRESS[loadProgress.key];
+  if (nextProgress === 69) {
+    void setVisualProgress(nextProgress);
+    startVisualProgressCreep();
+  } else {
+    stopVisualProgressCreep();
+    if (nextProgress != null) void setVisualProgress(nextProgress);
+  }
   renderLoadProgress();
 }
 
 function finishLoading() {
   loadingComplete = true;
+  stopVisualProgressCreep();
   void setVisualProgress(100).then(() => {
     window.setTimeout(() => loadingOverlayEl?.classList.add('is-hidden'), 80);
   });
