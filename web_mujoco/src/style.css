@@ -1,0 +1,117 @@
+:root {
+  color-scheme: dark;
+  font-family: "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: #111211;
+  color: #e6ece8;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  height: 100%;
+}
+
+.viewport {
+  position: relative;
+  min-width: 0;
+  background: radial-gradient(circle at 30% 20%, #1b2730, #0d1012 62%);
+}
+
+.viewport canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.panel {
+  padding: 20px 18px 28px;
+  border-left: 1px solid #2a332f;
+  background: #161a18;
+  overflow: auto;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: #8fd7c1;
+  letter-spacing: 0.08em;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 0 0 12px;
+  font-size: 20px;
+}
+
+.status {
+  margin: 0 0 10px;
+  color: #c5d4cc;
+  font-size: 13px;
+}
+
+.hint {
+  margin: 0 0 16px;
+  color: #8b9892;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+code {
+  color: #d7fff4;
+}
+
+.button-row {
+  margin-bottom: 16px;
+}
+
+button {
+  border: 1px solid #3b4a44;
+  background: #24302c;
+  color: #e6ece8;
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #2d3c37;
+}
+
+.joints {
+  display: grid;
+  gap: 12px;
+}
+
+.joint label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-bottom: 4px;
+  color: #b7c4bd;
+}
+
+.joint input {
+  width: 100%;
+}
+
+@media (max-width: 900px) {
+  .app {
+    grid-template-columns: 1fr;
+    grid-template-rows: 58vh auto;
+  }
+
+  .panel {
+    border-left: 0;
+    border-top: 1px solid #2a332f;
+  }
+}
