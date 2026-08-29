@@ -92,7 +92,7 @@ function primitiveGeometry(type, size, types) {
   return null;
 }
 
-function geomMaterial(model, index) {
+function geomMaterial(model, index, materialProps) {
   const rgba = model.geom_rgba.subarray(index * 4, index * 4 + 4);
   let color = new THREE.Color(rgba[0], rgba[1], rgba[2]);
   let opacity = rgba[3];
@@ -105,24 +105,37 @@ function geomMaterial(model, index) {
       color = new THREE.Color(matRgba[0], matRgba[1], matRgba[2]);
       opacity = matRgba[3];
     }
-    if (model.mat_metallic) {
-      metalness = model.mat_metallic[matid];
-    } else if (model.mat_specular) {
-      // MuJoCo stores metallic/roughness as custom XML attrs that the
-      // compiler ignores. Derive PBR from specular (RGB avg) and shininess.
-      const spec = model.mat_specular.subarray(matid * 4, matid * 4 + 4);
-      metalness = (spec[0] + spec[1] + spec[2]) / 3;
-    }
-    if (model.mat_roughness) {
-      roughness = model.mat_roughness[matid];
-    } else if (model.mat_shininess) {
-      roughness = 1 - model.mat_shininess[matid];
+    const mp = materialProps && materialProps[matid];
+    if (mp && (mp.metallic != null || mp.roughness != null)) {
+      if (mp.metallic != null) metalness = mp.metallic;
+      if (mp.roughness != null) roughness = mp.roughness;
+    } else {
+      if (model.mat_metallic) {
+        metalness = model.mat_metallic[matid];
+      } else if (model.mat_specular) {
+        const spec = model.mat_specular.subarray(matid * 4, matid * 4 + 4);
+        metalness = (spec[0] + spec[1] + spec[2]) / 3;
+      }
+      if (model.mat_roughness) {
+        roughness = model.mat_roughness[matid];
+      } else if (model.mat_shininess) {
+        roughness = 1 - model.mat_shininess[matid];
+      }
     }
   }
-  return new THREE.MeshStandardMaterial({
+  const finish = materialProps && materialProps[matid];
+  const isCnc = finish?.name === 'rs_anodized_silver_mat';
+  const isTable = finish?.name === 'rs_table';
+  const isMetal = metalness >= 0.45;
+  if (isCnc) color.multiplyScalar(0.72);
+  if (isTable) color.multiplyScalar(0.58);
+  return new THREE.MeshPhysicalMaterial({
     color,
     metalness: Number.isFinite(metalness) ? Math.max(0, Math.min(1, metalness)) : 0.12,
     roughness: Number.isFinite(roughness) ? Math.max(0, Math.min(1, roughness)) : 0.55,
+    envMapIntensity: isCnc ? 1.9 : isMetal ? 1.2 : 0.72,
+    clearcoat: isCnc ? 0.25 : 0,
+    clearcoatRoughness: isCnc ? 0.14 : 0.4,
     transparent: opacity < 0.999,
     opacity,
     side: THREE.DoubleSide
@@ -149,22 +162,23 @@ function setPose(mesh, xpos, xmat, index) {
 }
 
 function createGridTexture() {
-  const size = 512;
+  const size = 1024;
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = size;
   const ctx = canvas.getContext('2d');
 
-  ctx.fillStyle = '#0a1530';
+  ctx.fillStyle = '#020617';
   ctx.fillRect(0, 0, size, size);
 
   const glow = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size * 0.7);
-  glow.addColorStop(0, 'rgba(25, 70, 130, 0.18)');
-  glow.addColorStop(1, 'rgba(10, 21, 48, 0)');
+  glow.addColorStop(0, 'rgba(8, 47, 105, 0.48)');
+  glow.addColorStop(0.5, 'rgba(3, 21, 56, 0.18)');
+  glow.addColorStop(1, 'rgba(2, 6, 23, 0)');
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, size, size);
 
-  const sub = 4;
-  ctx.strokeStyle = 'rgba(30, 90, 160, 0.35)';
+  const sub = 10;
+  ctx.strokeStyle = 'rgba(0, 126, 255, 0.34)';
   ctx.lineWidth = 1;
   ctx.beginPath();
   for (let i = 1; i < sub; i += 1) {
@@ -174,29 +188,141 @@ function createGridTexture() {
   }
   ctx.stroke();
 
-  ctx.strokeStyle = 'rgba(80, 170, 255, 0.85)';
-  ctx.lineWidth = 2.5;
+  ctx.shadowColor = 'rgba(0, 214, 255, 0.9)';
+  ctx.shadowBlur = 10;
+  ctx.strokeStyle = 'rgba(0, 207, 255, 0.96)';
+  ctx.lineWidth = 3;
   ctx.strokeRect(0, 0, size, size);
+  ctx.shadowBlur = 0;
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(6, 6);
-  texture.anisotropy = 4;
+  texture.repeat.set(5, 5);
+  texture.anisotropy = 8;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+function createBackdropTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1600;
+  canvas.height = 900;
+  const ctx = canvas.getContext('2d');
+  const { width, height } = canvas;
+
+  const sky = ctx.createLinearGradient(0, 0, 0, height);
+  sky.addColorStop(0, '#010319');
+  sky.addColorStop(0.56, '#030629');
+  sky.addColorStop(0.72, '#06154b');
+  sky.addColorStop(0.76, '#03153d');
+  sky.addColorStop(1, '#01030f');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, width, height);
+
+  const horizonY = height * 0.73;
+  const horizon = ctx.createLinearGradient(0, horizonY - 60, 0, horizonY + 60);
+  horizon.addColorStop(0, 'rgba(0, 87, 255, 0)');
+  horizon.addColorStop(0.42, 'rgba(0, 118, 255, 0.24)');
+  horizon.addColorStop(0.5, 'rgba(0, 229, 255, 0.98)');
+  horizon.addColorStop(0.58, 'rgba(0, 94, 255, 0.30)');
+  horizon.addColorStop(1, 'rgba(0, 30, 110, 0)');
+  ctx.fillStyle = horizon;
+  ctx.fillRect(0, horizonY - 60, width, 120);
+
+  ctx.globalCompositeOperation = 'lighter';
+  [0.035, 0.18, 0.50, 0.82, 0.965].forEach((ratio, index) => {
+    const x = width * ratio;
+    const beam = ctx.createLinearGradient(x - 22, 0, x + 22, 0);
+    beam.addColorStop(0, 'rgba(0, 55, 255, 0)');
+    beam.addColorStop(0.42, 'rgba(0, 84, 255, 0.18)');
+    beam.addColorStop(0.5, index % 2 ? 'rgba(0, 121, 255, 0.78)' : 'rgba(0, 199, 255, 0.92)');
+    beam.addColorStop(0.58, 'rgba(0, 84, 255, 0.18)');
+    beam.addColorStop(1, 'rgba(0, 55, 255, 0)');
+    ctx.fillStyle = beam;
+    ctx.fillRect(x - 22, 0, 44, horizonY + 20);
+    ctx.fillStyle = 'rgba(92, 220, 255, 0.64)';
+    ctx.fillRect(x - 1, 0, 2, horizonY + 20);
+  });
+  ctx.globalCompositeOperation = 'source-over';
+
+  ctx.strokeStyle = 'rgba(16, 78, 178, 0.18)';
+  ctx.lineWidth = 1;
+  for (let y = 120; y < horizonY; y += 8) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(width, y);
+    ctx.stroke();
+  }
+
+  const vignette = ctx.createRadialGradient(width / 2, height * 0.55, height * 0.18, width / 2, height * 0.55, width * 0.62);
+  vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
+  vignette.addColorStop(1, 'rgba(0, 0, 14, 0.64)');
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, width, height);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+function createEnvironmentTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+  const { width, height } = canvas;
+
+  const base = ctx.createLinearGradient(0, 0, 0, height);
+  base.addColorStop(0, '#d8f6ff');
+  base.addColorStop(0.14, '#3977b8');
+  base.addColorStop(0.5, '#081b45');
+  base.addColorStop(0.76, '#0b3c75');
+  base.addColorStop(1, '#d8f7ff');
+  ctx.fillStyle = base;
+  ctx.fillRect(0, 0, width, height);
+
+  [0.08, 0.30, 0.57, 0.82].forEach((ratio, index) => {
+    const x = width * ratio;
+    const panel = ctx.createLinearGradient(x - 55, 0, x + 55, 0);
+    panel.addColorStop(0, 'rgba(37, 99, 235, 0)');
+    panel.addColorStop(0.35, 'rgba(61, 193, 255, 0.28)');
+    panel.addColorStop(0.5, index % 2 ? 'rgba(235, 252, 255, 0.98)' : 'rgba(74, 222, 255, 0.92)');
+    panel.addColorStop(0.65, 'rgba(61, 193, 255, 0.28)');
+    panel.addColorStop(1, 'rgba(37, 99, 235, 0)');
+    ctx.fillStyle = panel;
+    ctx.fillRect(x - 55, 0, 110, height);
+  });
+
+  const horizon = ctx.createLinearGradient(0, height * 0.62, 0, height * 0.83);
+  horizon.addColorStop(0, 'rgba(0, 41, 120, 0)');
+  horizon.addColorStop(0.48, 'rgba(60, 220, 255, 0.9)');
+  horizon.addColorStop(0.55, 'rgba(230, 252, 255, 0.98)');
+  horizon.addColorStop(1, 'rgba(0, 41, 120, 0)');
+  ctx.fillStyle = horizon;
+  ctx.fillRect(0, height * 0.62, width, height * 0.21);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.mapping = THREE.EquirectangularReflectionMapping;
   return texture;
 }
 
 export function createSceneView(host) {
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x101418);
+  const backdropTexture = createBackdropTexture();
+  scene.background = backdropTexture;
 
   const camera = new THREE.PerspectiveCamera(45, 1, 0.02, 20);
   camera.up.set(0, 0, 1);
   camera.position.set(0.85, -0.95, 0.62);
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.02;
+  if ('outputColorSpace' in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.domElement.style.zIndex = '0';
   host.appendChild(renderer.domElement);
   ['callouts', 'drag-cluster'].forEach((id) => {
@@ -210,32 +336,53 @@ export function createSceneView(host) {
   controls.target.set(0.28, 0, 0.16);
   controls.enableDamping = true;
 
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const environmentSource = createEnvironmentTexture();
+  const environmentTexture = pmrem.fromEquirectangular(environmentSource).texture;
+  scene.environment = environmentTexture;
+  environmentSource.dispose();
+  pmrem.dispose();
+
   RectAreaLightUniformsLib.init();
-  scene.add(new THREE.AmbientLight(0xf3efe6, 0.34));
-  scene.add(new THREE.HemisphereLight(0xe7eef8, 0x4a4742, 0.36));
+  scene.add(new THREE.AmbientLight(0x6f9bd4, 0.26));
+  scene.add(new THREE.HemisphereLight(0xd9f6ff, 0x021026, 0.48));
 
-  const ceiling = new THREE.RectAreaLight(0xfff2e2, 1.35, 1.9, 1.45);
-  ceiling.position.set(0.28, 0, 1.4);
-  ceiling.lookAt(0.28, 0, 0);
-  scene.add(ceiling);
+  const softbox = new THREE.RectAreaLight(0xeaf8ff, 2.0, 1.6, 1.15);
+  softbox.position.set(0.28, -0.58, 1.28);
+  softbox.lookAt(0.25, 0, 0.16);
+  scene.add(softbox);
 
-  const overhead = new THREE.SpotLight(0xfff6ea, 1.8, 6.2, Math.PI / 2.15, 1, 1.35);
-  overhead.position.set(0.28, 0, 1.85);
-  overhead.target.position.set(0.28, 0, 0);
-  overhead.castShadow = true;
-  overhead.shadow.mapSize.set(2048, 2048);
-  overhead.shadow.radius = 20;
-  overhead.shadow.blurSamples = 24;
-  overhead.shadow.bias = -0.00012;
-  overhead.shadow.normalBias = 0.02;
-  overhead.shadow.camera.near = 0.3;
-  overhead.shadow.camera.far = 4.6;
-  scene.add(overhead);
-  scene.add(overhead.target);
+  const cyanRim = new THREE.RectAreaLight(0x10cfff, 2.8, 0.75, 1.05);
+  cyanRim.position.set(-0.58, 0.2, 0.68);
+  cyanRim.lookAt(0.23, 0, 0.18);
+  scene.add(cyanRim);
 
-  const fill = new THREE.DirectionalLight(0xe6edf6, 0.06);
-  fill.position.set(0.55, -0.75, 0.85);
-  scene.add(fill);
+  const blueRim = new THREE.RectAreaLight(0x245cff, 1.9, 0.7, 0.9);
+  blueRim.position.set(0.86, 0.32, 0.62);
+  blueRim.lookAt(0.25, 0, 0.18);
+  scene.add(blueRim);
+
+  const key = new THREE.DirectionalLight(0xf2fbff, 1.0);
+  key.position.set(1.2, 0.8, 2.0);
+  key.castShadow = true;
+  key.shadow.mapSize.set(2048, 2048);
+  key.shadow.camera.near = 0.1;
+  key.shadow.camera.far = 6;
+  key.shadow.camera.left = -1.4;
+  key.shadow.camera.right = 1.4;
+  key.shadow.camera.top = 1.4;
+  key.shadow.camera.bottom = -1.4;
+  key.shadow.bias = -0.00012;
+  key.shadow.normalBias = 0.02;
+  scene.add(key);
+
+  const side = new THREE.DirectionalLight(0x8bdcff, 0.38);
+  side.position.set(-1, -0.5, 0.8);
+  scene.add(side);
+
+  const rim = new THREE.DirectionalLight(0x286fff, 0.62);
+  rim.position.set(-0.5, -1, 1.5);
+  scene.add(rim);
 
   const tcpMarker = new THREE.Mesh(
     new THREE.SphereGeometry(0.024, 16, 12),
@@ -280,7 +427,7 @@ export function createSceneView(host) {
     renderer.setSize(width, height, false);
   }
 
-  function build(mujoco, model) {
+  function build(mujoco, model, materialProps) {
     clear();
     types = geomTypes(mujoco);
     for (let i = 0; i < model.ngeom; i += 1) {
@@ -303,11 +450,13 @@ export function createSceneView(host) {
         if (!gridTexture) gridTexture = createGridTexture();
         material = new THREE.MeshStandardMaterial({
           map: gridTexture,
-          metalness: 0.15,
-          roughness: 0.72
+          color: 0x41658f,
+          metalness: 0.1,
+          roughness: 0.82,
+          envMapIntensity: 0.4
         });
       } else {
-        material = geomMaterial(model, i);
+        material = geomMaterial(model, i, materialProps);
       }
       const mesh = new THREE.Mesh(geometry, material);
       mesh.castShadow = type !== types.plane;
@@ -394,6 +543,8 @@ export function createSceneView(host) {
       observer.disconnect();
       clear();
       if (gridTexture) { gridTexture.dispose(); gridTexture = null; }
+      backdropTexture.dispose();
+      environmentTexture.dispose();
       controls.dispose();
       renderer.dispose();
       renderer.domElement.remove();

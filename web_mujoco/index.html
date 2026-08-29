@@ -9,6 +9,11 @@
 <body>
   <main class="app">
     <section class="viewport" id="viewport">
+      <div class="loading-overlay" id="loading-overlay" role="status" aria-live="polite">
+        <div class="loading-ring" aria-hidden="true"></div>
+        <p class="loading-title" data-i18n="loading.title">正在构建数字孪生</p>
+        <p class="loading-text" id="loading-text">正在启动…</p>
+      </div>
       <div class="callouts" id="callouts"></div>
       <div id="drag-cluster" class="drag-cluster">
         <div id="drag-marker" class="drag-marker" data-i18n-title="marker.tcp" title="拖拽 TCP"></div>
@@ -26,6 +31,7 @@
       <div class="button-row">
         <button type="button" id="toggle-drag" data-i18n="btn.dragOn">启用 TCP 拖拽</button>
         <button type="button" id="reset" data-i18n="btn.reset">复位</button>
+        <button type="button" id="toggle-guides" data-i18n="btn.guidesOn" aria-pressed="false">显示全部引导线</button>
         <select id="lang-select" class="lang-select" aria-label="选择语言">
           <option value="zh">🇨🇳 中文</option>
           <option value="ja">🇯🇵 日本語</option>

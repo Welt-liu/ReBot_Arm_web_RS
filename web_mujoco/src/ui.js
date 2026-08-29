@@ -43,6 +43,7 @@ export function createJointCallouts(root, joints, onChange) {
   const chips = {};
   let placedWidth = -1;
   let placedHeight = -1;
+  let showAllGuides = false;
 
   joints.visible.forEach((joint) => {
     const color = joint.color || '#8fd7c1';
@@ -223,11 +224,13 @@ export function createJointCallouts(root, joints, onChange) {
         item.dot.setAttribute('visibility', 'hidden');
         return;
       }
+      const focused = item.chip.classList.contains('is-open') || item.chip.matches(':hover, :focus-within');
+      const showGuide = showAllGuides || focused;
+      item.line.setAttribute('visibility', showGuide ? 'visible' : 'hidden');
+      item.dot.setAttribute('visibility', showGuide ? 'visible' : 'hidden');
       const attach = attachPoint(item);
       item.attachX = attach.x;
       item.attachY = attach.y;
-      item.line.setAttribute('visibility', 'visible');
-      item.dot.setAttribute('visibility', 'visible');
       item.line.setAttribute('x1', String(screen.x));
       item.line.setAttribute('y1', String(screen.y));
       item.line.setAttribute('x2', String(attach.x));
@@ -240,6 +243,9 @@ export function createJointCallouts(root, joints, onChange) {
   return {
     layout,
     closeChips: closeOpenChips,
+    setGuidesVisible(visible) {
+      showAllGuides = Boolean(visible);
+    },
     applyLang() {
       const gripper = chips.joint7;
       if (gripper) {

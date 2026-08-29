@@ -7,7 +7,6 @@ const SETTLE_TIMEOUT_MS = 900;
 const GRIPPER_OPEN = GRIPPER_JOINTS[0].max;
 const GRIPPER_CLOSE = 0;
 const FAB_CLEARANCE = 160;
-const UI_SELECTOR = '.callout-chip, .gripper-fab, .lang-switch, button, input';
 
 export function createTcpDrag({
   view,
@@ -80,7 +79,7 @@ export function createTcpDrag({
   }
 
   function applyOrbitLock() {
-    view.setOrbitEnabled(!enabled);
+    view.setOrbitEnabled(!(enabled && dragging));
     hostEl.classList.toggle('tcp-drag', enabled);
     hostEl.classList.toggle('tcp-dragging', dragging);
   }
@@ -118,12 +117,8 @@ export function createTcpDrag({
     onStatus(enabled ? t('status.dragOn') : t('status.dragOff'));
   }
 
-  function isUiControl(event) {
-    return Boolean(event.target.closest(UI_SELECTOR));
-  }
-
   function onPointerDown(event) {
-    if (!enabled || dragging || isUiControl(event)) return;
+    if (!enabled || dragging) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
@@ -137,7 +132,7 @@ export function createTcpDrag({
     view.camera.getWorldDirection(cameraDir);
     plane.setFromNormalAndCoplanarPoint(cameraDir, target);
     markerEl.classList.add('dragging');
-    hostEl.setPointerCapture(event.pointerId);
+    markerEl.setPointerCapture(event.pointerId);
   }
 
   function onPointerMove(event) {
@@ -159,8 +154,8 @@ export function createTcpDrag({
     if (!dragging) return;
     dragging = false;
     markerEl.classList.remove('dragging');
-    if (hostEl.hasPointerCapture(event.pointerId)) {
-      hostEl.releasePointerCapture(event.pointerId);
+    if (markerEl.hasPointerCapture(event.pointerId)) {
+      markerEl.releasePointerCapture(event.pointerId);
     }
     applyOrbitLock();
     const tcp = tcpVec();
@@ -242,10 +237,10 @@ export function createTcpDrag({
   toggleEl.addEventListener('click', () => setEnabled(!enabled));
   bindGripperButton(openEl, GRIPPER_OPEN);
   bindGripperButton(closeEl, GRIPPER_CLOSE);
-  hostEl.addEventListener('pointerdown', onPointerDown, true);
-  hostEl.addEventListener('pointermove', onPointerMove);
-  hostEl.addEventListener('pointerup', onPointerUp);
-  hostEl.addEventListener('pointercancel', onPointerUp);
+  markerEl.addEventListener('pointerdown', onPointerDown);
+  window.addEventListener('pointermove', onPointerMove);
+  window.addEventListener('pointerup', onPointerUp);
+  window.addEventListener('pointercancel', onPointerUp);
   onLangChange(applyLang);
 
   return {

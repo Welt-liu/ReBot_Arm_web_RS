@@ -1,4 +1,5 @@
 import { cpSync, existsSync, mkdirSync } from 'node:fs';
+import { createReadStream, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
@@ -8,6 +9,7 @@ const modelsSrc = path.resolve(
   root,
   '../rebotarm_ros2_RS/src/rebotarm_mujoco_rs/models'
 );
+const modelsSrcAbs = path.resolve(modelsSrc);
 
 function pagesBase() {
   const value = process.env.GITHUB_PAGES_BASE;
@@ -29,12 +31,51 @@ export default defineConfig({
     {
       name: 'copy-rs-models',
       closeBundle() {
-        if (!existsSync(modelsSrc)) {
+       if (!existsSync(modelsSrc)) {
           throw new Error(`RS models not found: ${modelsSrc}`);
-        }
+       }
         const dest = path.resolve(root, 'dist/models');
         mkdirSync(path.resolve(root, 'dist'), { recursive: true });
         cpSync(modelsSrc, dest, { recursive: true, dereference: true });
+      },
+      configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+          const base = pagesBase();
+          const prefix = `${base}models/`;
+          const url = decodeURIComponent(req.url || '');
+          if (!url.startsWith(prefix)) return next();
+          const rel = url.slice(prefix.length).split('?')[0];
+          const filePath = path.join(modelsSrcAbs, rel);
+          if (!filePath.startsWith(modelsSrcAbs)) return next();
+          try {
+            const stat = statSync(filePath);
+            if (!stat.isFile()) return next();
+            const etag = `W/"${stat.size.toString(16)}-${Math.trunc(stat.mtimeMs).toString(16)}"`;
+            const ext = path.extname(filePath).toLowerCase();
+            const types = {
+              '.xml': 'text/xml',
+              '.stl': 'application/octet-stream',
+              '.obj': 'text/plain',
+              '.msh': 'application/octet-stream'
+            };
+            res.setHeader('Content-Type', types[ext] || 'application/octet-stream');
+            res.setHeader('Content-Length', stat.size);
+            // Model meshes are large and rarely change. Reuse them directly on
+            // ordinary reloads; a hard refresh still revalidates against ETag.
+            res.setHeader('Cache-Control', 'public, max-age=3600, must-revalidate');
+            res.setHeader('ETag', etag);
+            res.setHeader('Last-Modified', stat.mtime.toUTCString());
+            if (req.headers['if-none-match'] === etag) {
+              res.statusCode = 304;
+              res.removeHeader('Content-Length');
+              res.end();
+              return;
+            }
+            createReadStream(filePath).pipe(res);
+          } catch {
+            next();
+          }
+        });
       }
     }
   ],
@@ -42,7 +83,7 @@ export default defineConfig({
     port: 5173,
     strictPort: false,
     headers: {
-      'Cache-Control': 'public, max-age=3600'
+      'Cache-Control': 'no-cache, no-store, must-revalidate'
     }
   }
 });
