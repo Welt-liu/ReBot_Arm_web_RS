@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
 
 const GEOM = {
   PLANE: 0,
@@ -147,6 +148,7 @@ export function createSceneView(host) {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.domElement.style.zIndex = '0';
   host.appendChild(renderer.domElement);
   ['callouts', 'drag-cluster'].forEach((id) => {
@@ -160,12 +162,32 @@ export function createSceneView(host) {
   controls.target.set(0.28, 0, 0.16);
   controls.enableDamping = true;
 
-  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
-  const key = new THREE.DirectionalLight(0xffffff, 1.05);
-  key.position.set(0.4, -0.6, 1.4);
-  key.castShadow = true;
-  scene.add(key);
-  scene.add(new THREE.HemisphereLight(0x9ecbff, 0x2a2f2c, 0.35));
+  RectAreaLightUniformsLib.init();
+  scene.add(new THREE.AmbientLight(0xf3efe6, 0.34));
+  scene.add(new THREE.HemisphereLight(0xe7eef8, 0x4a4742, 0.36));
+
+  const ceiling = new THREE.RectAreaLight(0xfff2e2, 1.35, 1.9, 1.45);
+  ceiling.position.set(0.28, 0, 1.4);
+  ceiling.lookAt(0.28, 0, 0);
+  scene.add(ceiling);
+
+  const overhead = new THREE.SpotLight(0xfff6ea, 1.8, 6.2, Math.PI / 2.15, 1, 1.35);
+  overhead.position.set(0.28, 0, 1.85);
+  overhead.target.position.set(0.28, 0, 0);
+  overhead.castShadow = true;
+  overhead.shadow.mapSize.set(2048, 2048);
+  overhead.shadow.radius = 20;
+  overhead.shadow.blurSamples = 24;
+  overhead.shadow.bias = -0.00012;
+  overhead.shadow.normalBias = 0.02;
+  overhead.shadow.camera.near = 0.3;
+  overhead.shadow.camera.far = 4.6;
+  scene.add(overhead);
+  scene.add(overhead.target);
+
+  const fill = new THREE.DirectionalLight(0xe6edf6, 0.06);
+  fill.position.set(0.55, -0.75, 0.85);
+  scene.add(fill);
 
   const tcpMarker = new THREE.Mesh(
     new THREE.SphereGeometry(0.02, 24, 16),
