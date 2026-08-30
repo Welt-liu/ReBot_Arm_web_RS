@@ -132,13 +132,27 @@ function extractMaterialProps(files) {
 }
 
 export async function loadRsScene(mujoco, onProgress) {
-  const vfs = new mujoco.MjVFS();
+  // Keep the comparatively expensive WASM startup and model downloads in
+  // flight together. Meshes are copied into MjVFS as each request completes,
+  // avoiding a second retained copy of the complete decompressed asset set.
+  const mujocoReady = Promise.resolve(mujoco).then(
+    (value) => ({ value }),
+    (error) => ({ error })
+  );
   const xmlQueue = [SCENE_XML];
   const seen = new Set();
   const meshFiles = new Set();
   const files = {};
   let loadedBytes = 0;
   let transferredBytes = 0;
+  let vfs = null;
+
+  async function requireRuntime() {
+    const runtime = await mujocoReady;
+    if (runtime.error) throw runtime.error;
+    if (!vfs) vfs = new runtime.value.MjVFS();
+    return runtime.value;
+  }
 
   try {
     // Resolve the small XML dependency graph first so every mesh is known
@@ -153,7 +167,6 @@ export async function loadRsScene(mujoco, onProgress) {
         report(onProgress, 'status.downloadProgress', { file: relative, mb });
       });
       files[relative] = bytes;
-      addToVfs(vfs, relative, bytes);
       loadedBytes += bytes.byteLength;
       transferredBytes += transferred;
 
@@ -198,6 +211,7 @@ export async function loadRsScene(mujoco, onProgress) {
           reportAssetProgress();
         });
         activeBytes.delete(relative);
+        await requireRuntime();
         addToVfs(vfs, relative, bytes);
         loadedBytes += bytes.byteLength;
         transferredBytes += transferred;
@@ -209,13 +223,16 @@ export async function loadRsScene(mujoco, onProgress) {
     const workerCount = Math.min(DOWNLOAD_CONCURRENCY, pending.length);
     await Promise.all(Array.from({ length: workerCount }, () => downloadWorker()));
 
+    report(onProgress, 'status.preparingRuntime');
+    const resolvedMujoco = await requireRuntime();
+    Object.entries(files).forEach(([name, bytes]) => addToVfs(vfs, name, bytes));
     const materialProps = extractMaterialProps(files);
     report(onProgress, 'status.compiling', { mb: (loadedBytes / 1048576).toFixed(1) });
-    const model = createModelFromVfs(mujoco, files, vfs);
-    const data = new mujoco.MjData(model);
-    mujoco.mj_forward(model, data);
-    return { model, data, loadedBytes, files: [...seen], materialProps };
+    const model = createModelFromVfs(resolvedMujoco, files, vfs);
+    const data = new resolvedMujoco.MjData(model);
+    resolvedMujoco.mj_forward(model, data);
+    return { mujoco: resolvedMujoco, model, data, loadedBytes, files: [...seen], materialProps };
   } finally {
-    vfs.delete();
+    vfs?.delete();
   }
 }

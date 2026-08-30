@@ -31,7 +31,7 @@ async function loadScene(mujoco) {
   vfs.addBuffer('rs_grasp_scene.xml', sceneXml);
   vfs.addBuffer('rs_arm.xml', armXml);
 
-  const meshRe = /\sfile="([^"]+\.STL)"/g;
+  const meshRe = /\sfile="([^"]+\.(?:stl|obj|msh))"/gi;
   const armText = armXml.toString('utf8');
   let match;
   while ((match = meshRe.exec(armText))) {

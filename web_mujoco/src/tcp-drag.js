@@ -295,6 +295,7 @@ export function createTcpDrag({
   return {
     update,
     stop,
+    setEnabled,
     applyLang,
     isEnabled() {
       return enabled;

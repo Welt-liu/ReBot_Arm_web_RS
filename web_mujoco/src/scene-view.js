@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
+import { resolveExplosionLayout } from './explosion-layout.js';
 
 const GEOM = {
   PLANE: 0,
@@ -12,6 +13,21 @@ const GEOM = {
   BOX: 6,
   MESH: 7
 };
+
+const EXPLOSION_DISTANCE = 0.115;
+const EXPLOSION_RETURN_SPEED = 5;
+const EXPLOSION_PART_GAP = 0.044;
+const EXPLOSION_GRIPPER_GAP = 0.066;
+const EXPLOSION_GROUND_CLEARANCE = 0.003;
+const EXPLOSION_CLEARANCE = 0.014;
+const PRESENTATION_DURATION_MS = 1500;
+const EXPLOSION_DURATION_MS = 3200;
+const PRESENTATION_OFFSET = { x: 0.055, y: -0.035, z: 0.072 };
+
+function smoothStep(value) {
+  const amount = Math.max(0, Math.min(1, value));
+  return amount * amount * (3 - 2 * amount);
+}
 
 function enumValue(mujoco, name, fallback) {
   const value = mujoco.mjtGeom?.[name]?.value;
@@ -309,6 +325,7 @@ function createEnvironmentTexture() {
 
 export function createSceneView(host) {
   const scene = new THREE.Scene();
+  const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
   const backdropTexture = createBackdropTexture();
   scene.background = backdropTexture;
 
@@ -415,9 +432,29 @@ export function createSceneView(host) {
   const planeHit = new THREE.Vector3();
 
   const meshes = [];
+  const explodableMeshes = [];
+  const explosionGroups = new Map();
+  const groundMeshes = [];
   const meshGeometries = new Map();
+  const explosionCenter = new THREE.Vector3();
+  const groupCenter = new THREE.Vector3();
+  const partCenter = new THREE.Vector3();
+  const explosionDirection = new THREE.Vector3();
+  const explosionTangent = new THREE.Vector3();
+  const presentationEuler = new THREE.Euler();
+  const presentationRotation = new THREE.Matrix4();
+  const presentationTransform = new THREE.Matrix4();
+  const presentationBack = new THREE.Matrix4();
   let gridTexture = null;
   let types = geomTypes({});
+  let explosionTarget = 0;
+  let explosionAmount = 0;
+  let presentationAmount = 0;
+  let sequenceStartedAt = 0;
+  let sequencePresentationStart = 0;
+  let sequenceExplosionStart = 0;
+  let explosionLayoutReady = false;
+  let lastSyncAt = 0;
 
   function resize() {
     const width = Math.max(1, host.clientWidth);
@@ -462,8 +499,25 @@ export function createSceneView(host) {
       mesh.castShadow = type !== types.plane;
       mesh.receiveShadow = true;
       mesh.userData.geomIndex = i;
+      mesh.userData.explodable = (model.geom_group ? model.geom_group[i] : 0) === 1;
+      const bodyId = model.geom_bodyid ? model.geom_bodyid[i] : -1;
+      mesh.userData.bodyName = bodyId >= 0
+        ? (mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY.value, bodyId) || `body-${bodyId}`)
+        : `geom-${i}`;
+      if (!geometry.boundingSphere) geometry.computeBoundingSphere();
+      if (!geometry.boundingBox) geometry.computeBoundingBox();
+      mesh.userData.localCenter = geometry.boundingSphere?.center.clone() || new THREE.Vector3();
+      mesh.userData.localBounds = geometry.boundingBox?.clone() || new THREE.Box3();
       scene.add(mesh);
       meshes.push(mesh);
+      if (type === types.plane) groundMeshes.push(mesh);
+      if (mesh.userData.explodable) {
+        explodableMeshes.push(mesh);
+        const group = explosionGroups.get(mesh.userData.bodyName) || [];
+        mesh.userData.explosionPartIndex = group.length;
+        group.push(mesh);
+        explosionGroups.set(mesh.userData.bodyName, group);
+      }
     }
   }
 
@@ -471,6 +525,154 @@ export function createSceneView(host) {
     const xpos = data.geom_xpos;
     const xmat = data.geom_xmat;
     meshes.forEach((mesh) => setPose(mesh, xpos, xmat, mesh.userData.geomIndex));
+
+    const now = performance.now();
+    const dt = lastSyncAt ? Math.min(0.05, (now - lastSyncAt) / 1000) : 1 / 60;
+    lastSyncAt = now;
+    if (reducedMotionQuery.matches) {
+      explosionAmount = explosionTarget;
+      presentationAmount = explosionTarget;
+    } else if (explosionTarget > 0) {
+      const elapsed = Math.max(0, now - sequenceStartedAt);
+      const presentationProgress = smoothStep(elapsed / PRESENTATION_DURATION_MS);
+      const explosionProgress = smoothStep(
+        (elapsed - PRESENTATION_DURATION_MS) / EXPLOSION_DURATION_MS
+      );
+      presentationAmount = THREE.MathUtils.lerp(
+        sequencePresentationStart,
+        1,
+        presentationProgress
+      );
+      explosionAmount = THREE.MathUtils.lerp(
+        sequenceExplosionStart,
+        1,
+        explosionProgress
+      );
+    } else {
+      // Reassembly runs in the opposite order: close the parts first, then
+      // return the complete arm from its presentation pose to the origin.
+      explosionAmount += (0 - explosionAmount) * (1 - Math.exp(-EXPLOSION_RETURN_SPEED * dt));
+      if (explosionAmount < 0.001) {
+        explosionAmount = 0;
+        presentationAmount += (
+          0 - presentationAmount
+        ) * (1 - Math.exp(-EXPLOSION_RETURN_SPEED * dt));
+        if (presentationAmount < 0.001) presentationAmount = 0;
+      }
+    }
+
+    if ((presentationAmount > 0 || explosionAmount > 0) && explodableMeshes.length) {
+      // Use one center per articulated body. Averaging every render mesh would
+      // bias the assembly center toward bodies with many trim pieces (notably
+      // the gripper) and send all of those pieces down almost the same ray.
+      explosionCenter.set(0, 0, 0);
+      explosionGroups.forEach((group) => {
+        groupCenter.set(0, 0, 0);
+        group.forEach((mesh) => {
+          partCenter.copy(mesh.userData.localCenter).applyMatrix4(mesh.matrix);
+          groupCenter.add(partCenter);
+        });
+        groupCenter.multiplyScalar(1 / group.length);
+        explosionCenter.add(groupCenter);
+      });
+      explosionCenter.multiplyScalar(1 / explosionGroups.size);
+
+      if (presentationAmount > 0) {
+        // Move the intact assembly into a display pose before separating it.
+        // Applying one world-space transform to every arm mesh preserves the
+        // articulated pose from MuJoCo while moving it away from the origin.
+        presentationEuler.set(
+          -0.07 * presentationAmount,
+          0.1 * presentationAmount,
+          0.22 * presentationAmount
+        );
+        presentationRotation.makeRotationFromEuler(presentationEuler);
+        presentationTransform.makeTranslation(
+          explosionCenter.x + PRESENTATION_OFFSET.x * presentationAmount,
+          explosionCenter.y + PRESENTATION_OFFSET.y * presentationAmount,
+          explosionCenter.z + PRESENTATION_OFFSET.z * presentationAmount
+        );
+        presentationBack.makeTranslation(
+          -explosionCenter.x,
+          -explosionCenter.y,
+          -explosionCenter.z
+        );
+        presentationTransform.multiply(presentationRotation).multiply(presentationBack);
+        explodableMeshes.forEach((mesh) => {
+          mesh.matrix.premultiply(presentationTransform);
+          mesh.matrixWorldNeedsUpdate = true;
+        });
+        explosionCenter.applyMatrix4(presentationTransform);
+      }
+
+      let groundZ = 0;
+      if (groundMeshes.length) {
+        groundZ = Math.max(...groundMeshes.map((mesh) => mesh.matrix.elements[14]));
+      }
+
+      if (!explosionLayoutReady && explosionAmount > 0) {
+        const entries = [];
+        explosionGroups.forEach((group, bodyName) => {
+          groupCenter.set(0, 0, 0);
+          group.forEach((mesh) => {
+            partCenter.copy(mesh.userData.localCenter).applyMatrix4(mesh.matrix);
+            groupCenter.add(partCenter);
+          });
+          groupCenter.multiplyScalar(1 / group.length);
+          explosionDirection.copy(groupCenter).sub(explosionCenter);
+          if (explosionDirection.lengthSq() < 1e-8) explosionDirection.set(1, 0, 0.18);
+          explosionDirection.normalize();
+          explosionTangent.set(-explosionDirection.y, explosionDirection.x, 0);
+          if (explosionTangent.lengthSq() < 1e-8) explosionTangent.set(0, 1, 0);
+          explosionTangent.normalize();
+
+          const isGripper = bodyName.startsWith('gripper');
+          const partGap = isGripper ? EXPLOSION_GRIPPER_GAP : EXPLOSION_PART_GAP;
+          const groupDistance = EXPLOSION_DISTANCE * (isGripper ? 1.14 : 1);
+          group.forEach((mesh, index) => {
+            const lane = index - (group.length - 1) / 2;
+            const offset = new THREE.Vector3(
+              explosionDirection.x * groupDistance + explosionTangent.x * lane * partGap,
+              explosionDirection.y * groupDistance + explosionTangent.y * lane * partGap,
+              explosionDirection.z * groupDistance + Math.abs(lane) * partGap * 0.22
+            );
+            const box = mesh.userData.localBounds.clone().applyMatrix4(mesh.matrix).translate(offset);
+            entries.push({
+              id: mesh.userData.geomIndex,
+              mesh,
+              box,
+              offset,
+              escapeDirection: offset.clone().normalize()
+            });
+          });
+        });
+
+        resolveExplosionLayout(entries, {
+          clearance: EXPLOSION_CLEARANCE,
+          groundZ: groundZ + EXPLOSION_GROUND_CLEARANCE
+        });
+        entries.forEach((entry) => {
+          entry.mesh.userData.explosionOffset = entry.offset;
+        });
+        explosionLayoutReady = true;
+      }
+
+      if (explosionLayoutReady) {
+        explodableMeshes.forEach((mesh) => {
+          const offset = mesh.userData.explosionOffset;
+          if (!offset) return;
+          mesh.matrix.elements[12] += offset.x * explosionAmount;
+          mesh.matrix.elements[13] += offset.y * explosionAmount;
+          mesh.matrix.elements[14] += offset.z * explosionAmount;
+          mesh.matrixWorldNeedsUpdate = true;
+        });
+      }
+    }
+
+    if (explosionTarget === 0 && explosionAmount === 0 && presentationAmount === 0) {
+      host.classList.remove('exploded');
+      explosionLayoutReady = false;
+    }
   }
 
   function render() {
@@ -503,6 +705,18 @@ export function createSceneView(host) {
     controls.enabled = enabled;
   }
 
+  function setExplosion(enabled) {
+    explosionTarget = enabled ? 1 : 0;
+    if (enabled) {
+      explosionLayoutReady = false;
+      sequenceStartedAt = performance.now();
+      sequencePresentationStart = presentationAmount;
+      sequenceExplosionStart = explosionAmount;
+      host.classList.add('exploded');
+    }
+    return enabled ? PRESENTATION_DURATION_MS + EXPLOSION_DURATION_MS : 0;
+  }
+
   function setDragVisuals({ tcp, target, dragMode, dragging }) {
     tcpMarker.visible = Boolean(dragMode && tcp);
     if (tcp) tcpMarker.position.set(tcp.x, tcp.y, tcp.z);
@@ -521,6 +735,9 @@ export function createSceneView(host) {
       mesh.material.dispose();
     });
     meshes.length = 0;
+    explodableMeshes.length = 0;
+    explosionGroups.clear();
+    groundMeshes.length = 0;
     meshGeometries.forEach((geometry) => geometry.dispose());
     meshGeometries.clear();
   }
@@ -537,6 +754,7 @@ export function createSceneView(host) {
     projectWorld,
     intersectPlane,
     setOrbitEnabled,
+    setExplosion,
     setDragVisuals,
     camera,
     dispose() {

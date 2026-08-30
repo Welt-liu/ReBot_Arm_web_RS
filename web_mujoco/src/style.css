@@ -181,6 +181,17 @@ body {
   touch-action: none;
 }
 
+.viewport.exploded .callouts,
+.viewport.exploded .drag-cluster {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.callouts,
+.drag-cluster {
+  transition: opacity 180ms ease;
+}
+
 .button-row {
   display: flex;
   flex-wrap: wrap;

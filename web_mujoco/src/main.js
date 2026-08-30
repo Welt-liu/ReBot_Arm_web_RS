@@ -11,6 +11,7 @@ import { persistAppShell } from './register-service-worker.js';
 const statusEl = document.getElementById('status');
 const calloutsEl = document.getElementById('callouts');
 const resetEl = document.getElementById('reset');
+const toggleExplosionEl = document.getElementById('toggle-explosion');
 const toggleDragEl = document.getElementById('toggle-drag');
 const toggleGuidesEl = document.getElementById('toggle-guides');
 const dragMarkerEl = document.getElementById('drag-marker');
@@ -31,7 +32,8 @@ const LOAD_STAGE_PROGRESS = {
   'status.download': 69,
   'status.downloadProgress': 69,
   'status.loadingAssets': 69,
-  'status.compiling': 89,
+  'status.preparingRuntime': 89,
+  'status.compiling': 94,
   'status.compiled': 99
 };
 
@@ -149,6 +151,9 @@ let panel = null;
 let tcpDrag = null;
 let readyCount = null;
 let guidesVisible = false;
+let explosionActive = false;
+let explosionAnimating = false;
+let explosionStatusTimer = 0;
 
 function renderGuidesToggle() {
   if (!toggleGuidesEl) return;
@@ -157,24 +162,35 @@ function renderGuidesToggle() {
   toggleGuidesEl.setAttribute('aria-pressed', String(guidesVisible));
 }
 
+function renderExplosionToggle() {
+  if (!toggleExplosionEl) return;
+  toggleExplosionEl.textContent = t(explosionActive ? 'btn.assemble' : 'btn.explode');
+  toggleExplosionEl.classList.toggle('active', explosionActive);
+  toggleExplosionEl.setAttribute('aria-pressed', String(explosionActive));
+}
+
 onLangChange(() => {
   applyStaticI18n();
   panel?.applyLang();
   tcpDrag?.applyLang();
   renderGuidesToggle();
+  renderExplosionToggle();
   if (!loadingComplete) {
     renderLoadProgress();
+  } else if (explosionActive) {
+    setStatus(t(explosionAnimating ? 'status.exploding' : 'status.exploded'));
   } else if (!tcpDrag?.isEnabled() && readyCount != null) {
     setStatus(t('status.ready', { n: readyCount }));
   }
 });
 
 async function main() {
-  const view = createSceneView(viewportEl);
   setLoadProgress('status.loadingWasm');
-  const mujoco = await loadMujocoModule();
-
-  const { model, data, files, materialProps } = await loadRsScene(mujoco, setLoadProgress);
+  const mujocoPromise = loadMujocoModule();
+  const { mujoco, model, data, files, materialProps } = await loadRsScene(mujocoPromise, setLoadProgress);
+  // Renderer, PMREM and lighting initialization are deliberately deferred so
+  // they do not block the WASM and model requests on the first load.
+  const view = createSceneView(viewportEl);
   const joints = bindJoints(mujoco, model);
   const physics = createPhysicsController(mujoco, model, data, joints);
   const ik = createTcpIk(mujoco, model, data, joints);
@@ -193,6 +209,24 @@ async function main() {
     renderGuidesToggle();
   });
   renderGuidesToggle();
+  toggleExplosionEl?.addEventListener('click', () => {
+    explosionActive = !explosionActive;
+    if (explosionActive && tcpDrag?.isEnabled()) tcpDrag.setEnabled(false);
+    window.clearTimeout(explosionStatusTimer);
+    const animationDuration = view.setExplosion(explosionActive);
+    explosionAnimating = explosionActive;
+    if (explosionActive) {
+      explosionStatusTimer = window.setTimeout(() => {
+        if (!explosionActive) return;
+        explosionAnimating = false;
+        setStatus(t('status.exploded'));
+      }, animationDuration);
+    }
+    panel.closeChips();
+    renderExplosionToggle();
+    setStatus(t(explosionActive ? 'status.exploding' : 'status.assembled'));
+  });
+  renderExplosionToggle();
   Object.entries(homePose(joints)).forEach(([name, amount]) => {
     panel.setTarget(name, amount);
     panel.setActual(name, amount);
@@ -217,6 +251,11 @@ async function main() {
 
   resetEl.addEventListener('click', () => {
     tcpDrag.stop();
+    window.clearTimeout(explosionStatusTimer);
+    explosionActive = false;
+    explosionAnimating = false;
+    view.setExplosion(false);
+    renderExplosionToggle();
     physics.reset();
     Object.entries(physics.targets).forEach(([name, amount]) => {
       panel.setTarget(name, amount);
