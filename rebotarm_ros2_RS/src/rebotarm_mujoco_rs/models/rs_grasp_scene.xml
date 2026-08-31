@@ -43,7 +43,7 @@
 
     <!-- Keep the 0.10 m work surface height while using the 30 mm DM-style tabletop. -->
     <body name="task_table" pos="0.35 0 0.085">
-      <geom name="task_table_geom" type="box" size="0.18 0.18 0.015" material="rs_table"
+      <geom name="task_table_geom" type="box" size="0.22 0.22 0.015" material="rs_table"
             friction="1.8 0.02 0.002" solref="0.003 1" solimp="0.98 0.995 0.0005"/>
     </body>
 
@@ -54,14 +54,14 @@
             solref="0.002 1" solimp="0.99 0.995 0.0005"/>
     </body>
 
-    <body name="blue_block" pos="0.32 0.08 0.119">
+    <body name="blue_block" pos="0.36 0.14 0.119">
       <freejoint name="blue_block_freejoint"/>
       <geom name="blue_block_geom" type="box" size="0.026 0.016 0.019"
             material="rs_blue" mass="0.050" friction="3.5 0.08 0.01"
             solref="0.002 1" solimp="0.99 0.995 0.0005"/>
     </body>
 
-    <body name="yellow_cylinder" pos="0.25 0.10 0.126">
+    <body name="yellow_cylinder" pos="0.48 -0.05 0.126">
       <freejoint name="yellow_cylinder_freejoint"/>
       <geom name="yellow_cylinder_geom" type="cylinder" size="0.020 0.026"
             material="rs_yellow" mass="0.042" friction="3.5 0.08 0.01"

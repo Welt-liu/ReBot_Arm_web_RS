@@ -99,8 +99,8 @@ export function createGraspDemo({ mujoco, model, data, joints, physics, ik, onCh
     const target = selected();
     objectStart = bodyPosition(target.bodyId);
     dropTarget = {
-      x: 0.445,
-      y: objectStart.y >= 0 ? -0.125 : 0.125,
+      x: 0.45,
+      y: objectStart.y >= 0 ? -0.17 : 0.17,
       z: objectStart.z
     };
     ikAngles = Object.fromEntries(

@@ -128,16 +128,16 @@ async function main() {
   const cubeSettled = bodyPos(mujoco, model, data, 'red_cube');
   assert(data.ncon > 0, `色块落地后应有接触，ncon=${data.ncon}`);
   console.log('memory exports', Object.keys(mujoco).filter((key) => /malloc|free|heap|memory/i.test(key)));
-  const contactForcePointer = mujoco._malloc(6 * Float64Array.BYTES_PER_ELEMENT);
+  const contactForceBuffer = new mujoco.DoubleBuffer(6);
+  const contactForce = contactForceBuffer.GetView();
   let maxContactForce = 0;
   for (let index = 0; index < data.ncon; index += 1) {
-    mujoco.HEAPF64.fill(0, contactForcePointer / 8, contactForcePointer / 8 + 6);
-    mujoco.mj_contactForce(model, data, index, contactForcePointer);
-    const contactForce = mujoco.HEAPF64.subarray(contactForcePointer / 8, contactForcePointer / 8 + 6);
+    contactForce.fill(0);
+    mujoco.mj_contactForce(model, data, index, contactForceBuffer);
     assert(contactForce.every(Number.isFinite), `接触力读取失败：${Array.from(contactForce).join(',')}`);
     maxContactForce = Math.max(maxContactForce, Math.abs(contactForce[0]));
   }
-  mujoco._free(contactForcePointer);
+  contactForceBuffer.delete();
   assert(maxContactForce > 0.01, `接触力应为正值：${maxContactForce}`);
   assert(
     cubeSettled[2] > 0.09 && cubeSettled[2] < 0.16,
@@ -177,20 +177,42 @@ async function main() {
     `复位后红块应回到初始位，got=${cubeReset.join(',')}`
   );
 
-  let graspState = null;
-  const graspDemo = createGraspDemo({
-    mujoco, model, data, joints, physics, ik,
-    onChange: (state) => { graspState = state; }
-  });
-  graspDemo.start('red');
-  for (let frame = 0; frame < 3200 && graspDemo.isRunning(); frame += 1) {
-    graspDemo.update();
-    physics.step(12);
+  const graspResults = {};
+  for (const [target, body] of [
+    ['red', 'red_cube'],
+    ['blue', 'blue_block'],
+    ['yellow', 'yellow_cylinder']
+  ]) {
+    physics.reset();
+    let graspState = null;
+    const graspDemo = createGraspDemo({
+      mujoco, model, data, joints, physics, ik,
+      onChange: (state) => { graspState = state; }
+    });
+    const start = bodyPos(mujoco, model, data, body);
+    graspDemo.start(target);
+    for (let frame = 0; frame < 3200 && graspDemo.isRunning(); frame += 1) {
+      graspDemo.update();
+      physics.step(12);
+    }
+    graspState = graspDemo.state();
+    const finalPosition = bodyPos(mujoco, model, data, body);
+    assert(
+      graspState.stage === 'complete',
+      `${target} 一键抓取未完成：${graspState.stage}/${graspState.message}`
+    );
+    const expectedSide = start[1] >= 0 ? -1 : 1;
+    assert(
+      Math.sign(finalPosition[1]) === expectedSide && Math.abs(finalPosition[1]) > 0.12,
+      `${target} 没有放到目标区：${finalPosition.join(',')}`
+    );
+    assert(
+      finalPosition[0] > 0.13 && finalPosition[0] < 0.57 &&
+        Math.abs(finalPosition[1]) < 0.22,
+      `${target} 放置后超出桌面：${finalPosition.join(',')}`
+    );
+    graspResults[target] = { stage: graspState.stage, position: finalPosition };
   }
-  graspState = graspDemo.state();
-  const graspedCube = bodyPos(mujoco, model, data, 'red_cube');
-  assert(graspState.stage === 'complete', `一键抓取未完成：${graspState.stage}/${graspState.message}`);
-  assert(graspedCube[1] > 0.07, `红块没有放到目标区：${graspedCube.join(',')}`);
 
   console.log(JSON.stringify({
     ngeom: model.ngeom,
@@ -209,7 +231,7 @@ async function main() {
     joint2: { afterOne, afterHold },
     gripper,
     cube: { settledZ: cubeSettled[2], reset: cubeReset },
-    graspDemo: { stage: graspState.stage, cube: graspedCube }
+    graspDemo: graspResults
   }, null, 2));
 
   data.delete();
