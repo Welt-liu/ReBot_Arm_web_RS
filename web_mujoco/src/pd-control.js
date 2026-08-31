@@ -93,5 +93,28 @@ export function createPhysicsController(mujoco, model, data, joints) {
     mujoco.mj_forward(model, data);
   }
 
-  return { targets, setTarget, setTargets, step, reset };
+  function telemetry() {
+    const samples = arm.map((joint) => ({
+      name: joint.name,
+      target: targets[joint.name],
+      position: data.qpos[joint.qposadr],
+      error: targets[joint.name] - data.qpos[joint.qposadr],
+      torque: data.qfrc_actuator?.[joint.dofadr] ?? data.ctrl[joint.actuatorId],
+      torqueLimit: joint.tauLimit
+    }));
+    samples.push({
+      name: 'joint7',
+      target: targets.joint7,
+      position: data.qpos[gripper.qposadr],
+      error: targets.joint7 - data.qpos[gripper.qposadr],
+      torque: data.qfrc_actuator?.[gripper.dofadr] ?? data.ctrl[gripper.actuatorId],
+      torqueLimit: GRIPPER_TAU_LIMIT
+    });
+    const rmsError = Math.sqrt(
+      samples.reduce((sum, sample) => sum + sample.error * sample.error, 0) / samples.length
+    );
+    return { joints: samples, rmsError };
+  }
+
+  return { targets, setTarget, setTargets, step, reset, telemetry };
 }

@@ -31,6 +31,9 @@
     <mesh name="cnc_left" file="cnc_left.STL" />
     <mesh name="pla_right" file="pla_right.STL" />
     <mesh name="cnc_right" file="cnc_right.STL" />
+    <!-- B601-RS / RealSense D405 30-degree wrist mount by Bowen Zhu.
+         Source and license details: THIRD_PARTY_MODELS.md. -->
+    <mesh name="d405_wrist_mount" file="rebot_b601_rs_d405_mount_30deg.stl" scale="0.001 0.001 0.001" />
     <!-- DM 已验证的夹爪凸碰撞分片。DM 与 RS 对同一物理手指的 left/right
          命名相反，因此 RS left 使用 DM right 网格，RS right 使用 DM left 网格。
          网格坐标位于 gripper_end 坐标系，再由 geom 逆变换进入手指局部坐标系。 -->
@@ -51,6 +54,12 @@
     <material name="rs_wordmark_black_mat" rgba="0.010 0.012 0.011 1" specular="0.04" shininess="0.04" metallic="0.00" roughness="0.76" />
     <material name="rs_anodized_silver_mat" rgba="0.720 0.760 0.730 1" specular="0.72" shininess="0.90" metallic="0.88" roughness="0.18" />
     <material name="rs_seeed_green_mat" rgba="0.725 0.835 0.118 1" specular="0.22" shininess="0.26" metallic="0.18" roughness="0.34" />
+    <!-- The mount uses the upstream simulation's diagnostic orange so the
+         printed part remains distinguishable from the black wrist motor. -->
+    <material name="d405_mount_mat" rgba="1.000 0.320 0.020 1" specular="0.20" shininess="0.22" metallic="0.04" roughness="0.64" />
+    <material name="d405_housing_mat" rgba="0.160 0.205 0.225 1" specular="0.42" shininess="0.48" metallic="0.22" roughness="0.38" />
+    <material name="d405_front_mat" rgba="0.025 0.038 0.046 1" specular="0.32" shininess="0.44" metallic="0.12" roughness="0.34" />
+    <material name="d405_lens_mat" rgba="0.020 0.420 0.700 1" specular="0.90" shininess="0.96" metallic="0.10" roughness="0.08" />
   </asset>
 
   <worldbody>
@@ -104,6 +113,31 @@
                     <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="rs_seeed_green_mat" type="mesh" mesh="pla7_green" />
                     <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="rs_anodized_silver_mat" type="mesh" mesh="cnc7" />
                     <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="rs_motor_black_mat" type="mesh" mesh="motor_7" />
+                    <!-- Validated D405 eye-in-hand assembly. The mount keeps the
+                         camera 30 degrees downward and aligns the left imager
+                         with the gripper centreline. Visual only: no extra
+                         collision or inertial terms are added. -->
+                    <geom name="d405_wrist_mount" type="mesh" mesh="d405_wrist_mount"
+                          pos="-0.086309 -0.000001456 0.000001" quat="0.5 0.5 0.5 0.5"
+                          group="1" contype="0" conaffinity="0" material="d405_mount_mat" />
+                    <geom name="d405_camera_body" type="box" size="0.021 0.021 0.0115"
+                          pos="-0.078896708 -0.009 0.066321644"
+                          xyaxes="0 1 0 0.5 0 0.866025404"
+                          group="1" contype="0" conaffinity="0" material="d405_housing_mat" />
+                    <geom name="d405_camera_front" type="box" size="0.0202 0.0202 0.001"
+                          pos="-0.068071708 -0.009 0.060071644"
+                          xyaxes="0 1 0 0.5 0 0.866025404"
+                          group="1" contype="0" conaffinity="0" material="d405_front_mat" />
+                    <geom name="d405_left_imager" type="cylinder" size="0.0055 0.0012"
+                          pos="-0.066166 -0.0000 0.058972"
+                          xyaxes="0 1 0 0.5 0 0.866025404"
+                          group="1" contype="0" conaffinity="0" material="d405_lens_mat" />
+                    <geom name="d405_right_imager" type="cylinder" size="0.0055 0.0012"
+                          pos="-0.066166 -0.0180 0.058972"
+                          xyaxes="0 1 0 0.5 0 0.866025404"
+                          group="1" contype="0" conaffinity="0" material="d405_lens_mat" />
+                    <camera name="wrist_rgb" pos="-0.072141710 0 0.062421644"
+                            xyaxes="0 -1 0 0.5 0 0.866025404" fovy="62.82" />
                     <geom name="gripper_palm_collision" pos="0 0 0" rgba="0 0 0 0" group="3"
                           contype="1" conaffinity="1" condim="6" type="mesh" mesh="gripper_end"
                           friction="1.2 0.10 0.02" solref="0.002 1" solimp="0.98 0.995 0.0005" />

@@ -22,7 +22,7 @@ _OBJECTS = ("red_cube", "blue_block", "yellow_cylinder")
 
 
 class RsSceneCamera(Node):
-    """Render the synchronized RS grasp scene through its overhead camera."""
+    """Render the synchronized RS grasp scene through a named MuJoCo camera."""
 
     def __init__(self) -> None:
         super().__init__("rebotarm_rs_scene_camera")
@@ -33,7 +33,7 @@ class RsSceneCamera(Node):
         self.declare_parameter("image_topic", "")
         self.declare_parameter("camera_info_topic", "")
         self.declare_parameter("camera_name", "overhead_rgb")
-        self.declare_parameter("frame_id", "overhead_rgb_frame")
+        self.declare_parameter("frame_id", "")
         self.declare_parameter("width", 320)
         self.declare_parameter("height", 240)
         self.declare_parameter("publish_hz", 8.0)
@@ -53,16 +53,19 @@ class RsSceneCamera(Node):
             self.get_parameter("object_states_topic").value
             or f"/{namespace}/mujoco/object_states"
         )
+        self.camera_name = str(self.get_parameter("camera_name").value)
         self.image_topic = str(
             self.get_parameter("image_topic").value
-            or f"/{namespace}/mujoco/overhead_rgb/image_raw"
+            or f"/{namespace}/mujoco/{self.camera_name}/image_raw"
         )
         self.camera_info_topic = str(
             self.get_parameter("camera_info_topic").value
-            or f"/{namespace}/mujoco/overhead_rgb/camera_info"
+            or f"/{namespace}/mujoco/{self.camera_name}/camera_info"
         )
-        self.camera_name = str(self.get_parameter("camera_name").value)
-        self.frame_id = str(self.get_parameter("frame_id").value)
+        self.frame_id = str(
+            self.get_parameter("frame_id").value
+            or f"{self.camera_name}_frame"
+        )
         self.width = max(int(self.get_parameter("width").value), 64)
         self.height = max(int(self.get_parameter("height").value), 64)
         publish_hz = max(float(self.get_parameter("publish_hz").value), 0.5)
@@ -102,7 +105,7 @@ class RsSceneCamera(Node):
         )
         self.create_timer(1.0 / publish_hz, self._render)
         self.get_logger().info(
-            "RS overhead camera ready: "
+            "RS scene camera ready: "
             f"camera={self.camera_name}, image={self.image_topic}, "
             f"size={self.width}x{self.height}@{publish_hz:g}Hz"
         )

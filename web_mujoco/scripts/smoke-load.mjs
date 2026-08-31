@@ -5,6 +5,7 @@ import loadMujoco from '@mujoco/mujoco';
 import { ARM_JOINTS, bindJoints } from '../src/kinematics.js';
 import { createPhysicsController } from '../src/pd-control.js';
 import { createTcpIk } from '../src/tcp-ik.js';
+import { createGraspDemo } from '../src/grasp-demo.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const modelsDir = path.resolve(here, '../../rebotarm_ros2_RS/src/rebotarm_mujoco_rs/models');
@@ -18,6 +19,26 @@ function namedId(mujoco, model, type, name) {
 function bodyPos(mujoco, model, data, name) {
   const id = namedId(mujoco, model, mujoco.mjtObj.mjOBJ_BODY.value, name);
   return [data.xpos[id * 3], data.xpos[id * 3 + 1], data.xpos[id * 3 + 2]];
+}
+
+function meshExtent(model, meshId) {
+  const start = model.mesh_vertadr[meshId] * 3;
+  const count = model.mesh_vertnum[meshId];
+  const min = [Infinity, Infinity, Infinity];
+  const max = [-Infinity, -Infinity, -Infinity];
+  for (let index = 0; index < count; index += 1) {
+    for (let axis = 0; axis < 3; axis += 1) {
+      const value = model.mesh_vert[start + index * 3 + axis];
+      min[axis] = Math.min(min[axis], value);
+      max[axis] = Math.max(max[axis], value);
+    }
+  }
+  return max.map((value, axis) => value - min[axis]);
+}
+
+function geomPosition(mujoco, model, data, name) {
+  const id = namedId(mujoco, model, mujoco.mjtObj.mjOBJ_GEOM.value, name);
+  return Array.from(data.geom_xpos.subarray(id * 3, id * 3 + 3));
 }
 
 function assert(condition, message) {
@@ -50,11 +71,45 @@ async function main() {
   const { model, data, vfs } = await loadScene(mujoco);
   const joints = bindJoints(mujoco, model);
   const physics = createPhysicsController(mujoco, model, data, joints);
+  const wristCameraId = namedId(
+    mujoco,
+    model,
+    mujoco.mjtObj.mjOBJ_CAMERA.value,
+    'wrist_rgb'
+  );
+  const wristCameraPosition = Array.from(
+    data.cam_xpos.subarray(wristCameraId * 3, wristCameraId * 3 + 3)
+  );
+  const mountGeomId = namedId(
+    mujoco,
+    model,
+    mujoco.mjtObj.mjOBJ_GEOM.value,
+    'd405_wrist_mount'
+  );
+  const mountExtent = meshExtent(model, model.geom_dataid[mountGeomId]);
+  const gripperBodyId = namedId(
+    mujoco,
+    model,
+    mujoco.mjtObj.mjOBJ_BODY.value,
+    'gripper_end'
+  );
+  assert(model.ncam >= 2, `应包含俯视和腕部相机，ncam=${model.ncam}`);
+  assert(model.geom_bodyid[mountGeomId] === gripperBodyId, 'D405 支架没有安装在 gripper_end');
+  assert(model.geom_group[mountGeomId] < 3, 'D405 支架被放入隐藏渲染组');
+  assert(
+    Math.max(...mountExtent) > 0.04 && Math.max(...mountExtent) < 0.20,
+    `D405 支架尺寸异常：${mountExtent.join(',')}`
+  );
+  assert(
+    wristCameraPosition.every(Number.isFinite),
+    `腕部相机位姿无效：${wristCameraPosition.join(',')}`
+  );
   assert(Number.isInteger(joints.byName.joint2.id), '关节 id 无效');
   assert(Number.isFinite(data.xanchor[joints.byName.joint2.id * 3]), 'xanchor 无法读取');
 
   const ik = createTcpIk(mujoco, model, data, joints);
   const tcp0 = ik.tcpPosition();
+  const tcpMatrix = Array.from(data.xmat.subarray(ik.bodyId * 9, ik.bodyId * 9 + 9));
   const ikAngles = Object.fromEntries(
     ARM_JOINTS.map((joint) => [joint.name, data.qpos[joints.byName[joint.name].qposadr]])
   );
@@ -72,6 +127,18 @@ async function main() {
   physics.step(200);
   const cubeSettled = bodyPos(mujoco, model, data, 'red_cube');
   assert(data.ncon > 0, `色块落地后应有接触，ncon=${data.ncon}`);
+  console.log('memory exports', Object.keys(mujoco).filter((key) => /malloc|free|heap|memory/i.test(key)));
+  const contactForcePointer = mujoco._malloc(6 * Float64Array.BYTES_PER_ELEMENT);
+  let maxContactForce = 0;
+  for (let index = 0; index < data.ncon; index += 1) {
+    mujoco.HEAPF64.fill(0, contactForcePointer / 8, contactForcePointer / 8 + 6);
+    mujoco.mj_contactForce(model, data, index, contactForcePointer);
+    const contactForce = mujoco.HEAPF64.subarray(contactForcePointer / 8, contactForcePointer / 8 + 6);
+    assert(contactForce.every(Number.isFinite), `接触力读取失败：${Array.from(contactForce).join(',')}`);
+    maxContactForce = Math.max(maxContactForce, Math.abs(contactForce[0]));
+  }
+  mujoco._free(contactForcePointer);
+  assert(maxContactForce > 0.01, `接触力应为正值：${maxContactForce}`);
   assert(
     cubeSettled[2] > 0.09 && cubeSettled[2] < 0.16,
     `红块应停在桌面上，z=${cubeSettled[2]}`
@@ -86,6 +153,13 @@ async function main() {
   physics.step(500);
   const afterHold = data.qpos[qposadr];
   assert(Math.abs(afterHold - 0.3) < 0.05, `joint2 应变到目标附近，q=${afterHold}`);
+  const wristCameraAfterJointMotion = Array.from(
+    data.cam_xpos.subarray(wristCameraId * 3, wristCameraId * 3 + 3)
+  );
+  const wristCameraTravel = Math.hypot(
+    ...wristCameraAfterJointMotion.map((value, index) => value - wristCameraPosition[index])
+  );
+  assert(wristCameraTravel > 0.01, `腕部相机没有随机械臂运动：${wristCameraTravel}`);
 
   physics.setTarget('joint7', 0.03);
   physics.step(400);
@@ -103,13 +177,39 @@ async function main() {
     `复位后红块应回到初始位，got=${cubeReset.join(',')}`
   );
 
+  let graspState = null;
+  const graspDemo = createGraspDemo({
+    mujoco, model, data, joints, physics, ik,
+    onChange: (state) => { graspState = state; }
+  });
+  graspDemo.start('red');
+  for (let frame = 0; frame < 3200 && graspDemo.isRunning(); frame += 1) {
+    graspDemo.update();
+    physics.step(12);
+  }
+  graspState = graspDemo.state();
+  const graspedCube = bodyPos(mujoco, model, data, 'red_cube');
+  assert(graspState.stage === 'complete', `一键抓取未完成：${graspState.stage}/${graspState.message}`);
+  assert(graspedCube[1] > 0.07, `红块没有放到目标区：${graspedCube.join(',')}`);
+
   console.log(JSON.stringify({
     ngeom: model.ngeom,
+    ncam: model.ncam,
+    wristCameraPosition,
+    wristCameraTravel,
+    d405MountExtent: mountExtent,
+    d405MountPosition: geomPosition(mujoco, model, data, 'd405_wrist_mount'),
+    d405BodyPosition: geomPosition(mujoco, model, data, 'd405_camera_body'),
+    d405FrontPosition: geomPosition(mujoco, model, data, 'd405_camera_front'),
+    tcpHome: tcp0,
+    tcpMatrix,
     ncon: data.ncon,
+    maxContactForce,
     timestep: model.opt.timestep,
     joint2: { afterOne, afterHold },
     gripper,
-    cube: { settledZ: cubeSettled[2], reset: cubeReset }
+    cube: { settledZ: cubeSettled[2], reset: cubeReset },
+    graspDemo: { stage: graspState.stage, cube: graspedCube }
   }, null, 2));
 
   data.delete();

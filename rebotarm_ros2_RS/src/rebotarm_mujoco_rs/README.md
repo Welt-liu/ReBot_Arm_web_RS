@@ -16,7 +16,7 @@ ROS `JointState`, so the real arm continues to have a single owner: the
 `reBotArmController` node.
 
 The RS package now also includes a physics grasp environment with red, blue,
-and yellow objects, an overhead ROS camera, object detections, Cartesian IK,
+and yellow objects, overhead and D405-style wrist ROS cameras, object detections, Cartesian IK,
 trajectory actions, and task recording services used by `rebotarm_agent`.
 
 Modes:
@@ -33,6 +33,8 @@ Important topics:
 
 - `/rebotarm_rs/mujoco/object_states`
 - `/rebotarm_rs/mujoco/overhead_rgb/image_raw`
+- `/rebotarm_rs/mujoco/wrist_rgb/image_raw`
+- `/rebotarm_rs/mujoco/wrist_rgb/camera_info`
 - `/rebotarm_rs/vision/color_blocks/detections`
 
 Task endpoints:

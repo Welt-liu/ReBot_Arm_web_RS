@@ -2,6 +2,10 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
 import { resolveExplosionLayout } from './explosion-layout.js';
+import {
+  EXPLOSION_TIMELINE_DURATION_MS,
+  evaluateExplosionTimeline
+} from './explosion-timeline.js';
 
 const GEOM = {
   PLANE: 0,
@@ -15,18 +19,52 @@ const GEOM = {
 };
 
 const EXPLOSION_DISTANCE = 0.115;
-const EXPLOSION_RETURN_SPEED = 5;
 const EXPLOSION_PART_GAP = 0.044;
 const EXPLOSION_GRIPPER_GAP = 0.066;
 const EXPLOSION_GROUND_CLEARANCE = 0.003;
 const EXPLOSION_CLEARANCE = 0.014;
-const PRESENTATION_DURATION_MS = 1500;
-const EXPLOSION_DURATION_MS = 3200;
+const MAIN_VIEW_HELPER_LAYER = 1;
 const PRESENTATION_OFFSET = { x: 0.055, y: -0.035, z: 0.072 };
+const EXPLOSION_STAGE_KEYS = [
+  'gripper', 'joint6', 'joint5', 'joint4', 'joint3', 'joint2', 'joint1', 'base'
+];
 
-function smoothStep(value) {
-  const amount = Math.max(0, Math.min(1, value));
-  return amount * amount * (3 - 2 * amount);
+function explosionStageForBody(bodyName) {
+  if (bodyName.startsWith('gripper')) return 0;
+  const link = bodyName.match(/^link([1-6])$/)?.[1];
+  if (link) return 7 - Number(link);
+  return 7;
+}
+
+function partKind(name) {
+  const value = name.toLowerCase();
+  if (value.includes('d405') || value.includes('camera') || value.includes('imager')) return 'camera';
+  if (value.includes('wordmark') || value.includes('badge')) return 'badge';
+  if (value.includes('gripper') || value.includes('finger')) return 'gripper';
+  if (value.includes('motor')) return 'motor';
+  if (value.includes('cnc')) return 'structure';
+  if (value.includes('pla')) return 'cover';
+  if (value.includes('base')) return 'base';
+  if (value.includes('link')) return 'link';
+  return 'component';
+}
+
+function namedObject(mujoco, model, type, id, fallback = '') {
+  if (!Number.isInteger(id) || id < 0 || type == null) return fallback;
+  return mujoco.mj_id2name(model, type, id) || fallback;
+}
+
+function nearestJointName(mujoco, model, bodyId) {
+  let current = bodyId;
+  while (current > 0) {
+    const count = model.body_jntnum ? model.body_jntnum[current] : 0;
+    if (count > 0) {
+      const jointId = model.body_jntadr[current];
+      return namedObject(mujoco, model, mujoco.mjtObj.mjOBJ_JOINT.value, jointId, `joint-${jointId}`);
+    }
+    current = model.body_parentid ? model.body_parentid[current] : 0;
+  }
+  return '';
 }
 
 function enumValue(mujoco, name, fallback) {
@@ -142,6 +180,8 @@ function geomMaterial(model, index, materialProps) {
   const finish = materialProps && materialProps[matid];
   const isCnc = finish?.name === 'rs_anodized_silver_mat';
   const isTable = finish?.name === 'rs_table';
+  const isD405 = finish?.name?.startsWith('d405_');
+  const isD405Lens = finish?.name === 'd405_lens_mat';
   const isMetal = metalness >= 0.45;
   if (isCnc) color.multiplyScalar(0.72);
   if (isTable) color.multiplyScalar(0.58);
@@ -152,6 +192,8 @@ function geomMaterial(model, index, materialProps) {
     envMapIntensity: isCnc ? 1.9 : isMetal ? 1.2 : 0.72,
     clearcoat: isCnc ? 0.25 : 0,
     clearcoatRoughness: isCnc ? 0.14 : 0.4,
+    emissive: isD405 ? color.clone().multiplyScalar(isD405Lens ? 0.36 : 0.10) : 0x000000,
+    emissiveIntensity: isD405Lens ? 0.55 : isD405 ? 0.18 : 0,
     transparent: opacity < 0.999,
     opacity,
     side: THREE.DoubleSide
@@ -332,6 +374,14 @@ export function createSceneView(host) {
   const camera = new THREE.PerspectiveCamera(45, 1, 0.02, 20);
   camera.up.set(0, 0, 1);
   camera.position.set(0.85, -0.95, 0.62);
+  camera.layers.enable(MAIN_VIEW_HELPER_LAYER);
+  const overheadCamera = new THREE.PerspectiveCamera(48, 4 / 3, 0.02, 4);
+  overheadCamera.matrixAutoUpdate = false;
+  const wristCamera = new THREE.PerspectiveCamera(62.82, 4 / 3, 0.02, 4);
+  wristCamera.matrixAutoUpdate = false;
+  const previewDocument = host.ownerDocument;
+  const overheadCanvas = previewDocument.getElementById('overhead-camera-canvas');
+  const wristCanvas = previewDocument.getElementById('wrist-camera-canvas');
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -348,6 +398,22 @@ export function createSceneView(host) {
   });
 
   const ndc = new THREE.Vector3();
+  const CAMERA_PREVIEW_INTERVAL_MS = 100;
+  const overheadRenderer = overheadCanvas
+    ? new THREE.WebGLRenderer({ canvas: overheadCanvas, antialias: true, powerPreference: 'low-power' })
+    : null;
+  const wristRenderer = wristCanvas
+    ? new THREE.WebGLRenderer({ canvas: wristCanvas, antialias: true, powerPreference: 'low-power' })
+    : null;
+  [overheadRenderer, wristRenderer].forEach((previewRenderer) => {
+    if (!previewRenderer) return;
+    previewRenderer.setPixelRatio(1);
+    previewRenderer.setSize(320, 240, false);
+    previewRenderer.shadowMap.enabled = false;
+    previewRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+    previewRenderer.toneMappingExposure = 1.02;
+    if ('outputColorSpace' in previewRenderer) previewRenderer.outputColorSpace = THREE.SRGBColorSpace;
+  });
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.target.set(0.28, 0, 0.16);
@@ -411,6 +477,7 @@ export function createSceneView(host) {
     })
   );
   tcpMarker.visible = false;
+  tcpMarker.layers.set(MAIN_VIEW_HELPER_LAYER);
   scene.add(tcpMarker);
 
   const targetGhost = new THREE.Mesh(
@@ -418,6 +485,7 @@ export function createSceneView(host) {
     new THREE.MeshBasicMaterial({ color: 0xf2a541, transparent: true, opacity: 0.85 })
   );
   targetGhost.visible = false;
+  targetGhost.layers.set(MAIN_VIEW_HELPER_LAYER);
   scene.add(targetGhost);
 
   const dragErrorLine = new THREE.Line(
@@ -425,14 +493,41 @@ export function createSceneView(host) {
     new THREE.LineBasicMaterial({ color: 0xff6b5f, transparent: true, opacity: 0.82 })
   );
   dragErrorLine.visible = false;
+  dragErrorLine.layers.set(MAIN_VIEW_HELPER_LAYER);
   scene.add(dragErrorLine);
 
   const raycaster = new THREE.Raycaster();
   const ndcMouse = new THREE.Vector2();
   const planeHit = new THREE.Vector3();
+  const selectionBounds = new THREE.Box3();
+  const selectionHelper = new THREE.Box3Helper(selectionBounds, 0x4defff);
+  selectionHelper.visible = false;
+  selectionHelper.layers.set(MAIN_VIEW_HELPER_LAYER);
+  scene.add(selectionHelper);
+
+  const contactPointGeometry = new THREE.BufferGeometry();
+  const contactPoints = new THREE.Points(
+    contactPointGeometry,
+    new THREE.PointsMaterial({ size: 0.008, sizeAttenuation: true, vertexColors: true })
+  );
+  contactPoints.visible = false;
+  contactPoints.layers.set(MAIN_VIEW_HELPER_LAYER);
+  scene.add(contactPoints);
+
+  const contactNormalGeometry = new THREE.BufferGeometry();
+  const contactNormals = new THREE.LineSegments(
+    contactNormalGeometry,
+    new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.92 })
+  );
+  contactNormals.visible = false;
+  contactNormals.layers.set(MAIN_VIEW_HELPER_LAYER);
+  scene.add(contactNormals);
 
   const meshes = [];
   const explodableMeshes = [];
+  const cameraModelMeshes = [];
+  const partMeshes = new Map();
+  const parts = [];
   const explosionGroups = new Map();
   const groundMeshes = [];
   const meshGeometries = new Map();
@@ -447,14 +542,25 @@ export function createSceneView(host) {
   const presentationBack = new THREE.Matrix4();
   let gridTexture = null;
   let types = geomTypes({});
-  let explosionTarget = 0;
+  let timelineProgress = 0;
+  let playbackDirection = 0;
+  let explosionStageCount = EXPLOSION_STAGE_KEYS.length;
+  let timelineListener = null;
+  let lastTimelineSignature = '';
   let explosionAmount = 0;
   let presentationAmount = 0;
-  let sequenceStartedAt = 0;
-  let sequencePresentationStart = 0;
-  let sequenceExplosionStart = 0;
   let explosionLayoutReady = false;
   let lastSyncAt = 0;
+  let selectedMesh = null;
+  let partIsolated = false;
+  let selectionListener = null;
+  let pickStart = null;
+  let lastCameraPreviewAt = -Infinity;
+  let overheadCameraId = -1;
+  let wristCameraId = -1;
+  let overheadCameraEnabled = false;
+  let wristCameraEnabled = false;
+  let cameraModelVisible = true;
 
   function resize() {
     const width = Math.max(1, host.clientWidth);
@@ -472,8 +578,9 @@ export function createSceneView(host) {
       const type = model.geom_type[i];
       const size = model.geom_size.subarray(i * 3, i * 3 + 3);
       let geometry = null;
+      let meshId = -1;
       if (type === types.mesh) {
-        const meshId = model.geom_dataid[i];
+        meshId = model.geom_dataid[i];
         if (!meshGeometries.has(meshId)) {
           meshGeometries.set(meshId, createMeshGeometry(model, meshId));
         }
@@ -504,6 +611,7 @@ export function createSceneView(host) {
       mesh.userData.bodyName = bodyId >= 0
         ? (mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY.value, bodyId) || `body-${bodyId}`)
         : `geom-${i}`;
+      mesh.userData.explosionStage = explosionStageForBody(mesh.userData.bodyName);
       if (!geometry.boundingSphere) geometry.computeBoundingSphere();
       if (!geometry.boundingBox) geometry.computeBoundingBox();
       mesh.userData.localCenter = geometry.boundingSphere?.center.clone() || new THREE.Vector3();
@@ -517,8 +625,58 @@ export function createSceneView(host) {
         mesh.userData.explosionPartIndex = group.length;
         group.push(mesh);
         explosionGroups.set(mesh.userData.bodyName, group);
+        const meshName = namedObject(
+          mujoco,
+          model,
+          mujoco.mjtObj.mjOBJ_MESH?.value,
+          meshId,
+          ''
+        );
+        const geomName = namedObject(
+          mujoco,
+          model,
+          mujoco.mjtObj.mjOBJ_GEOM.value,
+          i,
+          ''
+        );
+        const materialId = model.geom_matid ? model.geom_matid[i] : -1;
+        const label = meshName || geomName || `${mesh.userData.bodyName}-${group.length}`;
+        const part = {
+          id: String(i),
+          label,
+          body: mesh.userData.bodyName,
+          joint: nearestJointName(mujoco, model, bodyId),
+          material: namedObject(
+            mujoco,
+            model,
+            mujoco.mjtObj.mjOBJ_MATERIAL.value,
+            materialId,
+            ''
+          ),
+          kind: partKind(label),
+          stage: mesh.userData.explosionStage
+        };
+        mesh.userData.part = part;
+        mesh.userData.cameraModel = part.kind === 'camera';
+        if (mesh.userData.cameraModel) cameraModelMeshes.push(mesh);
+        mesh.userData.baseEmissive = mesh.material.emissive?.clone() || null;
+        mesh.userData.baseEmissiveIntensity = mesh.material.emissiveIntensity || 0;
+        parts.push(part);
+        partMeshes.set(part.id, mesh);
       }
     }
+    parts.sort((a, b) => a.stage - b.stage || a.label.localeCompare(b.label));
+    explosionStageCount = Math.max(
+      1,
+      ...explodableMeshes.map((mesh) => mesh.userData.explosionStage + 1)
+    );
+    const cameraType = mujoco.mjtObj.mjOBJ_CAMERA?.value;
+    overheadCameraId = cameraType == null
+      ? -1
+      : mujoco.mj_name2id(model, cameraType, 'overhead_rgb');
+    wristCameraId = cameraType == null
+      ? -1
+      : mujoco.mj_name2id(model, cameraType, 'wrist_rgb');
   }
 
   function sync(data) {
@@ -529,37 +687,21 @@ export function createSceneView(host) {
     const now = performance.now();
     const dt = lastSyncAt ? Math.min(0.05, (now - lastSyncAt) / 1000) : 1 / 60;
     lastSyncAt = now;
-    if (reducedMotionQuery.matches) {
-      explosionAmount = explosionTarget;
-      presentationAmount = explosionTarget;
-    } else if (explosionTarget > 0) {
-      const elapsed = Math.max(0, now - sequenceStartedAt);
-      const presentationProgress = smoothStep(elapsed / PRESENTATION_DURATION_MS);
-      const explosionProgress = smoothStep(
-        (elapsed - PRESENTATION_DURATION_MS) / EXPLOSION_DURATION_MS
-      );
-      presentationAmount = THREE.MathUtils.lerp(
-        sequencePresentationStart,
-        1,
-        presentationProgress
-      );
-      explosionAmount = THREE.MathUtils.lerp(
-        sequenceExplosionStart,
-        1,
-        explosionProgress
-      );
-    } else {
-      // Reassembly runs in the opposite order: close the parts first, then
-      // return the complete arm from its presentation pose to the origin.
-      explosionAmount += (0 - explosionAmount) * (1 - Math.exp(-EXPLOSION_RETURN_SPEED * dt));
-      if (explosionAmount < 0.001) {
-        explosionAmount = 0;
-        presentationAmount += (
-          0 - presentationAmount
-        ) * (1 - Math.exp(-EXPLOSION_RETURN_SPEED * dt));
-        if (presentationAmount < 0.001) presentationAmount = 0;
+    if (playbackDirection !== 0) {
+      if (reducedMotionQuery.matches) {
+        timelineProgress = playbackDirection > 0 ? 1 : 0;
+      } else {
+        timelineProgress = THREE.MathUtils.clamp(
+          timelineProgress + playbackDirection * (dt * 1000 / EXPLOSION_TIMELINE_DURATION_MS),
+          0,
+          1
+        );
       }
+      if (timelineProgress === 0 || timelineProgress === 1) playbackDirection = 0;
     }
+    const timeline = evaluateExplosionTimeline(timelineProgress, explosionStageCount);
+    presentationAmount = timeline.presentationAmount;
+    explosionAmount = timeline.explosionAmount;
 
     if ((presentationAmount > 0 || explosionAmount > 0) && explodableMeshes.length) {
       // Use one center per articulated body. Averaging every render mesh would
@@ -661,23 +803,48 @@ export function createSceneView(host) {
         explodableMeshes.forEach((mesh) => {
           const offset = mesh.userData.explosionOffset;
           if (!offset) return;
-          mesh.matrix.elements[12] += offset.x * explosionAmount;
-          mesh.matrix.elements[13] += offset.y * explosionAmount;
-          mesh.matrix.elements[14] += offset.z * explosionAmount;
+          const stageAmount = timeline.stageAmount(mesh.userData.explosionStage);
+          mesh.matrix.elements[12] += offset.x * stageAmount;
+          mesh.matrix.elements[13] += offset.y * stageAmount;
+          mesh.matrix.elements[14] += offset.z * stageAmount;
           mesh.matrixWorldNeedsUpdate = true;
         });
       }
     }
 
-    if (explosionTarget === 0 && explosionAmount === 0 && presentationAmount === 0) {
+    if (timelineProgress === 0) {
       host.classList.remove('exploded');
       explosionLayoutReady = false;
+    } else {
+      host.classList.add('exploded');
     }
+
+    if (selectedMesh) {
+      selectionBounds.copy(selectedMesh.userData.localBounds).applyMatrix4(selectedMesh.matrix);
+      selectionHelper.visible = selectedMesh.visible;
+      selectionHelper.updateMatrixWorld(true);
+    }
+    if (data.cam_xpos && data.cam_xmat) {
+      if (overheadCameraId >= 0) setPose(overheadCamera, data.cam_xpos, data.cam_xmat, overheadCameraId);
+      if (wristCameraId >= 0) setPose(wristCamera, data.cam_xpos, data.cam_xmat, wristCameraId);
+    }
+    notifyTimeline();
   }
 
   function render() {
     controls.update();
     renderer.render(scene, camera);
+    const now = performance.now();
+    if (now - lastCameraPreviewAt >= CAMERA_PREVIEW_INTERVAL_MS &&
+        (overheadCameraEnabled || wristCameraEnabled)) {
+      if (overheadCameraEnabled && overheadRenderer) {
+        overheadRenderer.render(scene, overheadCamera);
+      }
+      if (wristCameraEnabled && wristRenderer) {
+        wristRenderer.render(scene, wristCamera);
+      }
+      lastCameraPreviewAt = now;
+    }
   }
 
   function projectWorld(x, y, z) {
@@ -705,16 +872,160 @@ export function createSceneView(host) {
     controls.enabled = enabled;
   }
 
-  function setExplosion(enabled) {
-    explosionTarget = enabled ? 1 : 0;
-    if (enabled) {
+  function setOverheadCameraEnabled(enabled) {
+    overheadCameraEnabled = Boolean(enabled && overheadCameraId >= 0 && overheadRenderer);
+    if (overheadCameraEnabled) lastCameraPreviewAt = -Infinity;
+    return overheadCameraEnabled;
+  }
+
+  function setWristCameraEnabled(enabled) {
+    wristCameraEnabled = Boolean(enabled && wristCameraId >= 0 && wristRenderer);
+    if (wristCameraEnabled) lastCameraPreviewAt = -Infinity;
+    return wristCameraEnabled;
+  }
+
+  function timelineState() {
+    const state = evaluateExplosionTimeline(timelineProgress, explosionStageCount);
+    let stageKey = EXPLOSION_STAGE_KEYS[state.activeStage] || 'base';
+    if (timelineProgress === 0) stageKey = 'assembled';
+    else if (state.explosionAmount === 0) stageKey = 'presentation';
+    else if (timelineProgress === 1) stageKey = 'complete';
+    return {
+      progress: timelineProgress,
+      direction: playbackDirection,
+      stageIndex: state.activeStage,
+      stageKey
+    };
+  }
+
+  function notifyTimeline(force = false) {
+    if (!timelineListener) return;
+    const state = timelineState();
+    const signature = `${state.progress.toFixed(4)}:${state.direction}:${state.stageKey}`;
+    if (!force && signature === lastTimelineSignature) return;
+    lastTimelineSignature = signature;
+    timelineListener(state);
+  }
+
+  function playExplosion(direction = 1) {
+    playbackDirection = direction < 0 ? -1 : 1;
+    if ((playbackDirection > 0 && timelineProgress >= 1) ||
+        (playbackDirection < 0 && timelineProgress <= 0)) {
+      playbackDirection = 0;
+    }
+    if (playbackDirection > 0 && timelineProgress === 0) explosionLayoutReady = false;
+    if (timelineProgress > 0 || playbackDirection > 0) host.classList.add('exploded');
+    notifyTimeline(true);
+    const destination = playbackDirection >= 0 ? 1 : 0;
+    return Math.abs(destination - timelineProgress) * EXPLOSION_TIMELINE_DURATION_MS;
+  }
+
+  function pauseExplosion() {
+    playbackDirection = 0;
+    notifyTimeline(true);
+  }
+
+  function setExplosionProgress(value) {
+    playbackDirection = 0;
+    timelineProgress = THREE.MathUtils.clamp(Number(value) || 0, 0, 1);
+    if (timelineProgress === 0) {
       explosionLayoutReady = false;
-      sequenceStartedAt = performance.now();
-      sequencePresentationStart = presentationAmount;
-      sequenceExplosionStart = explosionAmount;
+      host.classList.remove('exploded');
+    } else {
       host.classList.add('exploded');
     }
-    return enabled ? PRESENTATION_DURATION_MS + EXPLOSION_DURATION_MS : 0;
+    notifyTimeline(true);
+  }
+
+  function resetExplosion() {
+    playbackDirection = 0;
+    timelineProgress = 0;
+    explosionAmount = 0;
+    presentationAmount = 0;
+    explosionLayoutReady = false;
+    host.classList.remove('exploded');
+    notifyTimeline(true);
+  }
+
+  function setExplosion(enabled) {
+    return playExplosion(enabled ? 1 : -1);
+  }
+
+  function restoreSelectionMaterial(mesh) {
+    if (!mesh?.material?.emissive) return;
+    if (mesh.userData.baseEmissive) mesh.material.emissive.copy(mesh.userData.baseEmissive);
+    mesh.material.emissiveIntensity = mesh.userData.baseEmissiveIntensity;
+  }
+
+  function applySelectionMaterial(mesh) {
+    if (!mesh?.material?.emissive) return;
+    mesh.material.emissive.set(0x18d9ff);
+    mesh.material.emissiveIntensity = 0.72;
+  }
+
+  function applyIsolation() {
+    explodableMeshes.forEach((mesh) => {
+      const allowedByCameraToggle = cameraModelVisible || !mesh.userData.cameraModel;
+      mesh.visible = allowedByCameraToggle && (!partIsolated || mesh === selectedMesh);
+    });
+    host.classList.toggle('part-isolated', partIsolated);
+    selectionHelper.visible = Boolean(selectedMesh?.visible);
+  }
+
+  function notifySelection() {
+    selectionListener?.({
+      part: selectedMesh?.userData.part || null,
+      isolated: partIsolated
+    });
+  }
+
+  function selectPart(id) {
+    const next = partMeshes.get(String(id));
+    if (!next) return false;
+    if (selectedMesh !== next) {
+      restoreSelectionMaterial(selectedMesh);
+      selectedMesh = next;
+      applySelectionMaterial(selectedMesh);
+    }
+    applyIsolation();
+    notifySelection();
+    return true;
+  }
+
+  function setPartIsolated(enabled) {
+    partIsolated = Boolean(enabled && selectedMesh);
+    applyIsolation();
+    notifySelection();
+  }
+
+  function clearPartSelection() {
+    restoreSelectionMaterial(selectedMesh);
+    selectedMesh = null;
+    partIsolated = false;
+    applyIsolation();
+    selectionHelper.visible = false;
+    notifySelection();
+  }
+
+  function setCameraModelVisible(enabled) {
+    cameraModelVisible = Boolean(enabled);
+    applyIsolation();
+    return cameraModelVisible;
+  }
+
+  function pickPart(clientX, clientY) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    ndcMouse.set(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1
+    );
+    raycaster.setFromCamera(ndcMouse, camera);
+    const hit = raycaster.intersectObjects(
+      explodableMeshes.filter((mesh) => mesh.visible),
+      false
+    )[0];
+    if (hit) selectPart(hit.object.userData.part.id);
+    else if (!partIsolated) clearPartSelection();
   }
 
   function setDragVisuals({ tcp, target, dragMode, dragging }) {
@@ -729,18 +1040,79 @@ export function createSceneView(host) {
     }
   }
 
+  function setContactVisuals(contacts = [], enabled = true) {
+    const shown = enabled ? contacts : [];
+    const pointPositions = new Float32Array(shown.length * 3);
+    const pointColors = new Float32Array(shown.length * 3);
+    const linePositions = new Float32Array(shown.length * 6);
+    const lineColors = new Float32Array(shown.length * 6);
+    shown.forEach((contact, index) => {
+      const [x, y, z] = contact.position;
+      const [nx, ny, nz] = contact.normal;
+      const length = 0.012 + Math.min(0.038, Math.log1p(contact.force) * 0.007);
+      pointPositions.set([x, y, z], index * 3);
+      pointColors.set(contact.selectedGrip ? [1, 0.72, 0.10] : [1, 0.20, 0.18], index * 3);
+      linePositions.set([x, y, z, x + nx * length, y + ny * length, z + nz * length], index * 6);
+      const color = contact.selectedGrip ? [1, 0.78, 0.16] : [0.12, 0.92, 1];
+      lineColors.set([...color, ...color], index * 6);
+    });
+    contactPointGeometry.setAttribute('position', new THREE.BufferAttribute(pointPositions, 3));
+    contactPointGeometry.setAttribute('color', new THREE.BufferAttribute(pointColors, 3));
+    contactNormalGeometry.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
+    contactNormalGeometry.setAttribute('color', new THREE.BufferAttribute(lineColors, 3));
+    contactPointGeometry.computeBoundingSphere();
+    contactNormalGeometry.computeBoundingSphere();
+    contactPoints.visible = shown.length > 0;
+    contactNormals.visible = shown.length > 0;
+  }
+
   function clear() {
+    restoreSelectionMaterial(selectedMesh);
+    selectedMesh = null;
+    partIsolated = false;
+    selectionHelper.visible = false;
+    host.classList.remove('part-isolated');
     meshes.forEach((mesh) => {
       scene.remove(mesh);
       mesh.material.dispose();
     });
     meshes.length = 0;
     explodableMeshes.length = 0;
+    cameraModelMeshes.length = 0;
     explosionGroups.clear();
     groundMeshes.length = 0;
+    parts.length = 0;
+    partMeshes.clear();
     meshGeometries.forEach((geometry) => geometry.dispose());
     meshGeometries.clear();
   }
+
+  function onPickPointerDown(event) {
+    if (event.button !== 0) return;
+    pickStart = { x: event.clientX, y: event.clientY, id: event.pointerId };
+  }
+
+  function onPickPointerUp(event) {
+    if (!pickStart || event.pointerId !== pickStart.id) return;
+    const distance = Math.hypot(event.clientX - pickStart.x, event.clientY - pickStart.y);
+    pickStart = null;
+    if (distance <= 5 && !host.classList.contains('tcp-dragging')) {
+      pickPart(event.clientX, event.clientY);
+    }
+  }
+
+  function onSelectionKeyDown(event) {
+    if (event.key === 'Escape' && selectedMesh) clearPartSelection();
+  }
+
+  function onPickPointerCancel() {
+    pickStart = null;
+  }
+
+  renderer.domElement.addEventListener('pointerdown', onPickPointerDown);
+  renderer.domElement.addEventListener('pointerup', onPickPointerUp);
+  renderer.domElement.addEventListener('pointercancel', onPickPointerCancel);
+  window.addEventListener('keydown', onSelectionKeyDown);
 
   const observer = new ResizeObserver(resize);
   observer.observe(host);
@@ -754,12 +1126,66 @@ export function createSceneView(host) {
     projectWorld,
     intersectPlane,
     setOrbitEnabled,
+    setOverheadCameraEnabled,
+    isOverheadCameraEnabled() {
+      return overheadCameraEnabled;
+    },
+    hasOverheadCamera() {
+      return overheadCameraId >= 0;
+    },
+    setWristCameraEnabled,
+    isWristCameraEnabled() {
+      return wristCameraEnabled;
+    },
+    hasWristCamera() {
+      return wristCameraId >= 0;
+    },
+    setCameraModelVisible,
+    isCameraModelVisible() {
+      return cameraModelVisible;
+    },
+    hasCameraModel() {
+      return cameraModelMeshes.length > 0;
+    },
     setExplosion,
+    playExplosion,
+    pauseExplosion,
+    setExplosionProgress,
+    resetExplosion,
+    getExplosionState: timelineState,
+    onExplosionChange(listener) {
+      timelineListener = listener;
+      lastTimelineSignature = '';
+      notifyTimeline(true);
+    },
+    getParts() {
+      return parts.map((part) => ({ ...part }));
+    },
+    selectPart,
+    setPartIsolated,
+    clearPartSelection,
+    onPartSelectionChange(listener) {
+      selectionListener = listener;
+      notifySelection();
+    },
     setDragVisuals,
+    setContactVisuals,
     camera,
     dispose() {
       observer.disconnect();
+      renderer.domElement.removeEventListener('pointerdown', onPickPointerDown);
+      renderer.domElement.removeEventListener('pointerup', onPickPointerUp);
+      renderer.domElement.removeEventListener('pointercancel', onPickPointerCancel);
+      window.removeEventListener('keydown', onSelectionKeyDown);
       clear();
+      selectionHelper.geometry.dispose();
+      selectionHelper.material.dispose();
+      contactPointGeometry.dispose();
+      contactPoints.material.dispose();
+      contactNormalGeometry.dispose();
+      contactNormals.material.dispose();
+      overheadRenderer?.dispose();
+      wristRenderer?.dispose();
       if (gridTexture) { gridTexture.dispose(); gridTexture = null; }
       backdropTexture.dispose();
       environmentTexture.dispose();

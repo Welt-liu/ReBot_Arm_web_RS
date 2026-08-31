@@ -103,9 +103,15 @@ export default defineConfig({
               '.msh': 'application/octet-stream'
             };
             res.setHeader('Content-Type', wantsGzip ? 'application/gzip' : (types[ext] || 'application/octet-stream'));
-            // Model meshes are large and rarely change. Reuse them directly on
-            // ordinary reloads; a hard refresh still revalidates against ETag.
-            res.setHeader('Cache-Control', 'public, max-age=3600, must-revalidate');
+            // XML changes frequently while tuning the scene, so ordinary page
+            // reloads must revalidate it. Keep the one-hour cache only for the
+            // large mesh assets that rarely change.
+            res.setHeader(
+              'Cache-Control',
+              ext === '.xml'
+                ? 'no-cache, must-revalidate'
+                : 'public, max-age=3600, must-revalidate'
+            );
             res.setHeader('ETag', etag);
             res.setHeader('Last-Modified', stat.mtime.toUTCString());
             if (req.headers['if-none-match'] === etag) {
