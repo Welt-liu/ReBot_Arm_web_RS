@@ -108,6 +108,27 @@ async function main() {
   assert(Number.isFinite(data.xanchor[joints.byName.joint2.id * 3]), 'xanchor 无法读取');
 
   const ik = createTcpIk(mujoco, model, data, joints);
+  const tableGeomId = namedId(
+    mujoco,
+    model,
+    mujoco.mjtObj.mjOBJ_GEOM.value,
+    'task_table_geom'
+  );
+  assert(
+    Math.abs(model.geom_size[tableGeomId * 3] - 0.25) < 0.001 &&
+      Math.abs(model.geom_size[tableGeomId * 3 + 1] - 0.28) < 0.001,
+    '桌面尺寸应为约 50 x 56 cm'
+  );
+
+  const activePoints = [
+    ...Object.values(STORAGE_ZONES),
+    ...Object.values(STACK_TARGETS)
+  ];
+  assert(
+    activePoints.every((point) => Math.hypot(point.x, point.y) <= 0.535),
+    `抓取/叠放目标超出可达包络：${JSON.stringify(activePoints)}`
+  );
+
   const tcp0 = ik.tcpPosition();
   const tcpMatrix = Array.from(data.xmat.subarray(ik.bodyId * 9, ik.bodyId * 9 + 9));
   const ikAngles = Object.fromEntries(
@@ -124,6 +145,18 @@ async function main() {
   assert(Math.abs(data.ctrl[0] - 1.25) < 1e-9, 'data.ctrl 无法写入');
 
   const cubeBefore = bodyPos(mujoco, model, data, 'red_cube');
+  const initialPositions = {
+    red: cubeBefore,
+    blue: bodyPos(mujoco, model, data, 'blue_block'),
+    yellow: bodyPos(mujoco, model, data, 'yellow_cylinder')
+  };
+  Object.entries(STORAGE_ZONES).forEach(([id, zone]) => {
+    const initial = initialPositions[id];
+    assert(
+      Math.hypot(initial[0] - zone.x, initial[1] - zone.y) > 0.15,
+      `${id} 初始位置距离收纳区过近：${initial.join(',')} vs ${zone.x},${zone.y}`
+    );
+  });
   physics.step(200);
   const cubeSettled = bodyPos(mujoco, model, data, 'red_cube');
   assert(data.ncon > 0, `色块落地后应有接触，ncon=${data.ncon}`);
@@ -161,6 +194,7 @@ async function main() {
   );
   assert(wristCameraTravel > 0.01, `腕部相机没有随机械臂运动：${wristCameraTravel}`);
 
+  physics.reset();
   physics.setTarget('joint7', 0.03);
   physics.step(400);
   const gripper = data.qpos[joints.byName.joint7.qposadr];
@@ -208,8 +242,8 @@ async function main() {
       `${target} 没有放回对应收纳区：${finalPosition.join(',')}, expected=${zone.x},${zone.y},${zone.z}`
     );
     assert(
-      finalPosition[0] > 0.13 && finalPosition[0] < 0.57 &&
-        Math.abs(finalPosition[1]) < 0.22,
+      finalPosition[0] > 0.13 && finalPosition[0] < 0.63 &&
+        Math.abs(finalPosition[1]) < 0.28,
       `${target} 放置后超出桌面：${finalPosition.join(',')}`
     );
     graspResults[target] = { stage: graspState.stage, position: finalPosition };

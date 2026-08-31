@@ -7,15 +7,15 @@ export const VISION_TARGETS = [
 ];
 
 export const STORAGE_ZONES = {
-  red: { x: 0.31, y: -0.09, z: 0.1225 },
-  blue: { x: 0.36, y: 0.14, z: 0.119 },
-  yellow: { x: 0.48, y: -0.05, z: 0.126 }
+  red: { x: 0.49, y: -0.16, z: 0.1225 },
+  blue: { x: 0.49, y: 0.00, z: 0.119 },
+  yellow: { x: 0.49, y: 0.16, z: 0.126 }
 };
 
 export const STACK_TARGETS = {
-  blue: { x: 0.44, y: 0.17, z: 0.119 },
-  red: { x: 0.44, y: 0.17, z: 0.1605 },
-  yellow: { x: 0.44, y: 0.17, z: 0.209 }
+  blue: { x: 0.32, y: 0.18, z: 0.119 },
+  red: { x: 0.32, y: 0.18, z: 0.1605 },
+  yellow: { x: 0.32, y: 0.18, z: 0.209 }
 };
 
 const OPEN_WIDTH = 0.046;
