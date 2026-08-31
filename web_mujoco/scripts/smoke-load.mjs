@@ -116,8 +116,8 @@ async function main() {
   );
   assert(
     Math.abs(model.geom_size[tableGeomId * 3] - 0.25) < 0.001 &&
-      Math.abs(model.geom_size[tableGeomId * 3 + 1] - 0.28) < 0.001,
-    '桌面尺寸应为约 50 x 56 cm'
+      Math.abs(model.geom_size[tableGeomId * 3 + 1] - 0.45) < 0.001,
+    '桌面尺寸应为约 50 x 90 cm'
   );
 
   const activePoints = [
@@ -243,7 +243,7 @@ async function main() {
     );
     assert(
       finalPosition[0] > 0.13 && finalPosition[0] < 0.63 &&
-        Math.abs(finalPosition[1]) < 0.28,
+        Math.abs(finalPosition[1]) < 0.45,
       `${target} 放置后超出桌面：${finalPosition.join(',')}`
     );
     graspResults[target] = { stage: graspState.stage, position: finalPosition };
