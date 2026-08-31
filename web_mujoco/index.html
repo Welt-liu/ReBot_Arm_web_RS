@@ -96,14 +96,15 @@
           <h2 id="grasp-title" data-i18n="grasp.title">一键抓取演示</h2>
           <span class="feature-badge">AUTO</span>
         </div>
-        <p class="control-hint" data-i18n="grasp.hint">从俯视视觉目标中选择颜色，然后执行完整物理抓取。</p>
+        <p class="control-hint" data-i18n="grasp.hint">从俯视视觉目标中选择颜色，然后放入对应收纳区；也可以一键按顺序叠放。</p>
         <div class="vision-targets" id="vision-targets" role="group" data-i18n-aria-label="vision.targetAria">
           <button type="button" class="vision-target active" data-target="red" aria-pressed="true"><i class="target-red"></i><span data-i18n="vision.red">红色方块</span></button>
           <button type="button" class="vision-target" data-target="blue" aria-pressed="false"><i class="target-blue"></i><span data-i18n="vision.blue">蓝色方块</span></button>
           <button type="button" class="vision-target" data-target="yellow" aria-pressed="false"><i class="target-yellow"></i><span data-i18n="vision.yellow">黄色圆柱</span></button>
         </div>
         <div class="grasp-actions">
-          <button type="button" id="start-grasp" data-i18n="grasp.start">▶ 开始抓取</button>
+          <button type="button" id="start-grasp" data-i18n="grasp.start">▶ 放入收纳区</button>
+          <button type="button" id="start-stack" data-i18n="grasp.stack">▲ 叠叠乐</button>
           <button type="button" id="cancel-grasp" disabled data-i18n="grasp.cancel">停止</button>
         </div>
         <div class="grasp-progress-row">

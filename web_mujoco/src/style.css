@@ -650,13 +650,18 @@ h1 {
 
 .grasp-actions {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr 1fr auto;
   gap: 6px;
 }
 
 .grasp-actions #start-grasp {
   border-color: rgba(46, 205, 170, 0.68);
   color: #a8ffe8;
+}
+
+.grasp-actions #start-stack {
+  border-color: rgba(240, 207, 71, 0.7);
+  color: #ffedb8;
 }
 
 .grasp-progress-row {

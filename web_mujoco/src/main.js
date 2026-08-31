@@ -36,6 +36,7 @@ const collapseWristCameraEl = document.getElementById('collapse-wrist-camera');
 const graspControlsEl = document.getElementById('grasp-controls');
 const visionTargetsEl = document.getElementById('vision-targets');
 const startGraspEl = document.getElementById('start-grasp');
+const startStackEl = document.getElementById('start-stack');
 const cancelGraspEl = document.getElementById('cancel-grasp');
 const graspProgressEl = document.getElementById('grasp-progress');
 const graspProgressValueEl = document.getElementById('grasp-progress-value');
@@ -250,6 +251,7 @@ function renderGraspControls() {
     button.disabled = graspState.running;
   });
   if (startGraspEl) startGraspEl.disabled = graspState.running || explosionState.progress > 0;
+  if (startStackEl) startStackEl.disabled = graspState.running || explosionState.progress > 0;
   if (cancelGraspEl) cancelGraspEl.disabled = !graspState.running;
   if (graspProgressEl) graspProgressEl.value = graspState.progress || 0;
   if (graspProgressValueEl) graspProgressValueEl.textContent = `${Math.round((graspState.progress || 0) * 100)}%`;
@@ -393,7 +395,9 @@ async function main() {
       renderExplosionControls();
       if (state.stage !== previousGraspStage) {
         previousGraspStage = state.stage;
-        if (state.stage === 'complete') setStatus(t('status.graspComplete'));
+        if (state.stage === 'complete') {
+          setStatus(t(state.mode === 'stack' ? 'status.stackComplete' : 'status.graspComplete'));
+        }
         else if (state.stage === 'failed') setStatus(t('status.graspFailed'));
         else if (state.running) setStatus(t(`status.grasp.${state.stage}`));
       }
@@ -412,6 +416,12 @@ async function main() {
     if (tcpDrag?.isEnabled()) tcpDrag.setEnabled(false);
     view.clearPartSelection();
     graspDemo.start(selectedVisionTarget);
+  });
+  startStackEl?.addEventListener('click', () => {
+    if (graspState.running || explosionState.progress > 0) return;
+    if (tcpDrag?.isEnabled()) tcpDrag.setEnabled(false);
+    view.clearPartSelection();
+    graspDemo.startStack();
   });
   cancelGraspEl?.addEventListener('click', () => {
     if (graspDemo.cancel()) setStatus(t('status.graspCancelled'));

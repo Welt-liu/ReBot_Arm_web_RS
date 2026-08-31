@@ -5,7 +5,7 @@ import loadMujoco from '@mujoco/mujoco';
 import { ARM_JOINTS, bindJoints } from '../src/kinematics.js';
 import { createPhysicsController } from '../src/pd-control.js';
 import { createTcpIk } from '../src/tcp-ik.js';
-import { createGraspDemo } from '../src/grasp-demo.js';
+import { createGraspDemo, STORAGE_ZONES, STACK_TARGETS } from '../src/grasp-demo.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const modelsDir = path.resolve(here, '../../rebotarm_ros2_RS/src/rebotarm_mujoco_rs/models');
@@ -189,7 +189,7 @@ async function main() {
       mujoco, model, data, joints, physics, ik,
       onChange: (state) => { graspState = state; }
     });
-    const start = bodyPos(mujoco, model, data, body);
+    const zone = STORAGE_ZONES[target];
     graspDemo.start(target);
     for (let frame = 0; frame < 3200 && graspDemo.isRunning(); frame += 1) {
       graspDemo.update();
@@ -201,10 +201,11 @@ async function main() {
       graspState.stage === 'complete',
       `${target} 一键抓取未完成：${graspState.stage}/${graspState.message}`
     );
-    const expectedSide = start[1] >= 0 ? -1 : 1;
     assert(
-      Math.sign(finalPosition[1]) === expectedSide && Math.abs(finalPosition[1]) > 0.12,
-      `${target} 没有放到目标区：${finalPosition.join(',')}`
+      Math.abs(finalPosition[0] - zone.x) < 0.025 &&
+        Math.abs(finalPosition[1] - zone.y) < 0.025 &&
+        Math.abs(finalPosition[2] - zone.z) < 0.02,
+      `${target} 没有放回对应收纳区：${finalPosition.join(',')}, expected=${zone.x},${zone.y},${zone.z}`
     );
     assert(
       finalPosition[0] > 0.13 && finalPosition[0] < 0.57 &&
@@ -213,6 +214,38 @@ async function main() {
     );
     graspResults[target] = { stage: graspState.stage, position: finalPosition };
   }
+
+  physics.reset();
+  const stackDemo = createGraspDemo({
+    mujoco, model, data, joints, physics, ik,
+    onChange: () => {}
+  });
+  stackDemo.startStack();
+  for (let frame = 0; frame < 12000 && stackDemo.isRunning(); frame += 1) {
+    stackDemo.update();
+    physics.step(12);
+  }
+  const stackState = stackDemo.state();
+  const stackedBlue = bodyPos(mujoco, model, data, 'blue_block');
+  const stackedRed = bodyPos(mujoco, model, data, 'red_cube');
+  const stackedYellow = bodyPos(mujoco, model, data, 'yellow_cylinder');
+  assert(stackState.stage === 'complete', `叠叠乐未完成：${stackState.stage}/${stackState.message}`);
+  [
+    ['blue', stackedBlue],
+    ['red', stackedRed],
+    ['yellow', stackedYellow]
+  ].forEach(([id, position]) => {
+    const target = STACK_TARGETS[id];
+    assert(
+      Math.abs(position[0] - target.x) < 0.035 &&
+        Math.abs(position[1] - target.y) < 0.035,
+      `叠叠乐 ${id} 没有对准堆叠中心：${position.join(',')}, expected=${target.x},${target.y}`
+    );
+  });
+  assert(
+    stackedBlue[2] < stackedRed[2] && stackedRed[2] < stackedYellow[2],
+    `叠叠乐顺序错误：blue=${stackedBlue[2]}, red=${stackedRed[2]}, yellow=${stackedYellow[2]}`
+  );
 
   console.log(JSON.stringify({
     ngeom: model.ngeom,
@@ -231,7 +264,13 @@ async function main() {
     joint2: { afterOne, afterHold },
     gripper,
     cube: { settledZ: cubeSettled[2], reset: cubeReset },
-    graspDemo: graspResults
+    graspDemo: graspResults,
+    stackDemo: {
+      stage: stackState.stage,
+      blue: stackedBlue,
+      red: stackedRed,
+      yellow: stackedYellow
+    }
   }, null, 2));
 
   data.delete();
