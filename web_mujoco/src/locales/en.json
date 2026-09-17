@@ -159,5 +159,22 @@
   "part.desc.base": "The fixed foundation supporting the arm's joint chain.",
   "part.desc.link": "A load-bearing link that transfers motion through the joint chain.",
   "part.desc.component": "A mechanical component belonging to {body}.",
-  "part.desc.camera": "A RealSense D405 eye-in-hand component on a 30-degree downward mount that follows the end effector."
+  "part.desc.camera": "A RealSense D405 eye-in-hand component on a 30-degree downward mount that follows the end effector.",
+  "leader.title": "Leader teleop",
+  "leader.on": "Enable leader",
+  "leader.off": "Exit leader",
+  "leader.hint": "Three encoders drive follower J1–J3. The free IMU at the tip sets orientation; J4–J6 track R03ᵀ Rimu.",
+  "leader.j1": "Encoder J1",
+  "leader.j2": "Encoder J2",
+  "leader.j3": "Encoder J3",
+  "leader.yaw": "IMU yaw",
+  "leader.pitch": "IMU pitch",
+  "leader.roll": "IMU roll",
+  "leader.holdImu": "Waist turn / IMU forward",
+  "leader.followArm": "IMU follows forearm",
+  "leader.readout": "q4 {q4} · q5 {q5} · q6 {q6} · ori err {err}° · relative yaw {rel}",
+  "status.leaderOn": "Leader on: encoders drive J1–J3, IMU sets gripper heading",
+  "status.leaderOff": "Leader off",
+  "status.leaderHold": "Forearm turned; IMU still faces the room, so the wrist should compensate",
+  "status.leaderFollow": "IMU aligned with the forearm; little wrist compensation"
 }

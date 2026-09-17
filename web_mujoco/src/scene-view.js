@@ -1170,6 +1170,12 @@ export function createSceneView(host) {
     },
     setDragVisuals,
     setContactVisuals,
+    attachHelper(object) {
+      object.traverse((child) => {
+        if (child.layers) child.layers.set(MAIN_VIEW_HELPER_LAYER);
+      });
+      scene.add(object);
+    },
     camera,
     dispose() {
       observer.disconnect();

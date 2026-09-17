@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>腕部耦合 · R46 = R03ᵀ Rimu</title>
+  <style>
+    :root {
+      --bg: #0f1412;
+      --panel: #171d1a;
+      --line: #2a3530;
+      --text: #e8f2ec;
+      --muted: #8aa396;
+      --forearm: #5ee0ff;
+      --imu: #c4f25a;
+      --grip: #ff9f5a;
+      --wrist: #d4b3ff;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 15px/1.45 "IBM Plex Sans", "Noto Sans SC", sans-serif;
+    }
+    header {
+      padding: 20px 24px 8px;
+      border-bottom: 1px solid var(--line);
+    }
+    header h1 { margin: 0 0 6px; font-size: 20px; font-weight: 600; }
+    header p { margin: 0; color: var(--muted); max-width: 72ch; }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(320px, 1fr) 380px;
+      gap: 16px;
+      padding: 16px 24px 28px;
+    }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+    canvas {
+      width: 100%;
+      height: auto;
+      background: #101614;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      display: block;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+    .panel h2 {
+      margin: 0 0 10px;
+      font-size: 13px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    label.row {
+      display: grid;
+      grid-template-columns: 108px 1fr 52px;
+      align-items: center;
+      gap: 8px;
+      margin: 8px 0;
+      font-size: 13px;
+    }
+    input[type="range"] { width: 100%; }
+    .val { font-variant-numeric: tabular-nums; color: var(--text); }
+    .formula {
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 14px;
+      padding: 10px 12px;
+      background: #101614;
+      border-radius: 8px;
+      margin: 0 0 12px;
+    }
+    .formula b { color: var(--wrist); font-weight: 600; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 12px;
+    }
+    td {
+      padding: 3px 6px;
+      text-align: right;
+      border-bottom: 1px solid var(--line);
+    }
+    .legend { display: flex; flex-wrap: wrap; gap: 12px 18px; margin: 10px 0 0; font-size: 13px; }
+    .sw { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+    .note {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .note strong { color: var(--text); font-weight: 600; }
+    .btns { display: flex; gap: 8px; margin: 12px 0 4px; }
+    button {
+      background: #22312b;
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
+    button:hover { border-color: #4a6358; }
+    .qbox {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .qbox div {
+      background: #101614;
+      border-radius: 8px;
+      padding: 8px;
+      text-align: center;
+    }
+    .qbox span { display: block; color: var(--muted); font-size: 11px; }
+    .qbox b { font-size: 18px; font-variant-numeric: tabular-nums; color: var(--wrist); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>J4–J6 跟 R<sub>03</sub><sup>T</sup> R<sub>imu</sub></h1>
+    <p>
+      Leader：三编码器决定小臂姿态 R<sub>03</sub>，IMU 固连在可自由转动的末端上决定 R<sub>imu</sub>。
+      从臂手腕要完成相对转动 R<sub>46</sub> = R<sub>03</sub><sup>T</sup> R<sub>imu</sub>，使夹爪世界姿态等于 IMU，而不是等于小臂。
+    </p>
+  </header>
+  <div class="layout">
+    <div>
+      <canvas id="view" width="900" height="640"></canvas>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--forearm)"></i>小臂前方（R<sub>03</sub> 的 x）</span>
+        <span><i class="sw" style="background:var(--imu)"></i>IMU / 手柄前方</span>
+        <span><i class="sw" style="background:var(--grip)"></i>夹爪前方（跟踪 IMU）</span>
+        <span><i class="sw" style="background:var(--wrist)"></i>手腕相对小臂的补偿角</span>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>实时结算</h2>
+      <div class="formula">R<sub>46</sub> = <b>R<sub>03</sub><sup>T</sup> R<sub>imu</sub></b></div>
+      <label class="row">J1 腰 / 小臂 yaw
+        <input id="q1" type="range" min="-180" max="180" value="90" />
+        <span class="val" id="q1v"></span>
+      </label>
+      <label class="row">J2 肩 pitch
+        <input id="q2" type="range" min="-90" max="90" value="0" />
+        <span class="val" id="q2v"></span>
+      </label>
+      <label class="row">J3 肘
+        <input id="q3" type="range" min="-90" max="90" value="0" />
+        <span class="val" id="q3v"></span>
+      </label>
+      <label class="row">IMU yaw
+        <input id="iy" type="range" min="-180" max="180" value="0" />
+        <span class="val" id="iyv"></span>
+      </label>
+      <label class="row">IMU pitch
+        <input id="ip" type="range" min="-90" max="90" value="0" />
+        <span class="val" id="ipv"></span>
+      </label>
+      <label class="row">IMU roll
+        <input id="ir" type="range" min="-180" max="180" value="0" />
+        <span class="val" id="irv"></span>
+      </label>
+      <div class="btns">
+        <button id="demo">示例：腰 90°、IMU 仍朝前</button>
+        <button id="lock">示例：IMU 跟着腰转</button>
+      </div>
+      <div class="qbox">
+        <div><span>示意 q4 (Z)</span><b id="j4"></b></div>
+        <div><span>示意 q5 (Y)</span><b id="j5"></b></div>
+        <div><span>示意 q6 (Z)</span><b id="j6"></b></div>
+      </div>
+      <p class="note" id="status"></p>
+      <h2 style="margin-top:16px">R46 矩阵</h2>
+      <table id="mat"></table>
+      <p class="note">
+        俯视图只画水平前方。q4–q6 用 ZYZ 欧拉角分解 R<sub>46</sub>，用来说明「相对小臂还要转多少」，不是 RS 实机的解析腕解。
+        <strong>夹爪始终画成与 IMU 重合</strong>，因为结算目标就是 R<sub>06</sub> = R<sub>imu</sub>。
+      </p>
+    </div>
+  </div>
+  <script>
+    const deg = (d) => d * Math.PI / 180;
+    const dstr = (r) => `${Math.round(r * 180 / Math.PI)}°`;
+
+    function Rx(a) {
+      const c = Math.cos(a), s = Math.sin(a);
+      return [[1,0,0],[0,c,-s],[0,s,c]];
+    }
+    function Ry(a) {
+      const c = Math.cos(a), s = Math.sin(a);
+      return [[c,0,s],[0,1,0],[-s,0,c]];
+    }
+    function Rz(a) {
+      const c = Math.cos(a), s = Math.sin(a);
+      return [[c,-s,0],[s,c,0],[0,0,1]];
+    }
+    function mul(A, B) {
+      const C = [[0,0,0],[0,0,0],[0,0,0]];
+      for (let i = 0; i < 3; i += 1) {
+        for (let j = 0; j < 3; j += 1) {
+          C[i][j] = A[i][0]*B[0][j] + A[i][1]*B[1][j] + A[i][2]*B[2][j];
+        }
+      }
+      return C;
+    }
+    function transpose(A) {
+      return [[A[0][0],A[1][0],A[2][0]],[A[0][1],A[1][1],A[2][1]],[A[0][2],A[1][2],A[2][2]]];
+    }
+    function matMul(...Ms) {
+      return Ms.reduce((acc, M) => mul(acc, M));
+    }
+    function eulerZYZ(R) {
+      const sy = Math.hypot(R[0][2], R[1][2]);
+      let q4, q5, q6;
+      if (sy > 1e-6) {
+        q4 = Math.atan2(R[1][2], R[0][2]);
+        q5 = Math.atan2(sy, R[2][2]);
+        q6 = Math.atan2(R[2][1], -R[2][0]);
+      } else {
+        q4 = Math.atan2(-R[1][0], R[1][1]);
+        q5 = R[2][2] > 0 ? 0 : Math.PI;
+        q6 = 0;
+      }
+      return { q4, q5, q6 };
+    }
+    function axisX(R) {
+      return { x: R[0][0], y: R[1][0] };
+    }
+
+    const els = {
+      q1: document.getElementById("q1"),
+      q2: document.getElementById("q2"),
+      q3: document.getElementById("q3"),
+      iy: document.getElementById("iy"),
+      ip: document.getElementById("ip"),
+      ir: document.getElementById("ir"),
+    };
+
+    function read() {
+      return {
+        q1: deg(+els.q1.value),
+        q2: deg(+els.q2.value),
+        q3: deg(+els.q3.value),
+        yaw: deg(+els.iy.value),
+        pitch: deg(+els.ip.value),
+        roll: deg(+els.ir.value),
+      };
+    }
+
+    function compute(s) {
+      const R03 = matMul(Rz(s.q1), Ry(s.q2), Rz(s.q3));
+      const Rimu = matMul(Rz(s.yaw), Ry(s.pitch), Rx(s.roll));
+      const R46 = mul(transpose(R03), Rimu);
+      const R06 = mul(R03, R46);
+      return { R03, Rimu, R46, R06, wrist: eulerZYZ(R46) };
+    }
+
+    const canvas = document.getElementById("view");
+    const ctx = canvas.getContext("2d");
+
+    function arrow(origin, dir, color, label, len) {
+      const L = len || 120;
+      const x2 = origin.x + dir.x * L;
+      const y2 = origin.y - dir.y * L;
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(origin.x, origin.y);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+      const ang = Math.atan2(origin.y - y2, x2 - origin.x);
+      ctx.beginPath();
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(x2 - 14 * Math.cos(ang - 0.4), y2 + 14 * Math.sin(ang - 0.4));
+      ctx.lineTo(x2 - 14 * Math.cos(ang + 0.4), y2 + 14 * Math.sin(ang + 0.4));
+      ctx.closePath();
+      ctx.fill();
+      ctx.font = "13px IBM Plex Sans, sans-serif";
+      ctx.fillText(label, x2 + 8, y2 - 8);
+    }
+
+    function render() {
+      const s = read();
+      document.getElementById("q1v").textContent = `${els.q1.value}°`;
+      document.getElementById("q2v").textContent = `${els.q2.value}°`;
+      document.getElementById("q3v").textContent = `${els.q3.value}°`;
+      document.getElementById("iyv").textContent = `${els.iy.value}°`;
+      document.getElementById("ipv").textContent = `${els.ip.value}°`;
+      document.getElementById("irv").textContent = `${els.ir.value}°`;
+
+      const { R03, Rimu, R46, wrist } = compute(s);
+      document.getElementById("j4").textContent = dstr(wrist.q4);
+      document.getElementById("j5").textContent = dstr(wrist.q5);
+      document.getElementById("j6").textContent = dstr(wrist.q6);
+
+      const rows = R46.map((row) =>
+        `<tr>${row.map((v) => `<td>${v.toFixed(3)}</td>`).join("")}</tr>`
+      ).join("");
+      document.getElementById("mat").innerHTML = rows;
+
+      const fYaw = Math.atan2(R03[1][0], R03[0][0]);
+      const iYaw = Math.atan2(Rimu[1][0], Rimu[0][0]);
+      const rel = ((iYaw - fYaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+      const sameImu = Math.abs(iYaw) < deg(8);
+      const waistTurned = Math.abs(fYaw) > deg(20);
+      let msg;
+      if (waistTurned && sameImu) {
+        msg = `腰已转 ${dstr(fYaw)}，IMU 仍朝房间前方。手腕相对小臂补偿约 ${dstr(rel)}，夹爪世界 yaw 不变。`;
+      } else if (Math.abs(rel) < deg(8)) {
+        msg = `IMU 与小臂前方几乎同向，R03ᵀ Rimu ≈ I，手腕几乎不用补。夹爪世界 yaw 跟着小臂走。`;
+      } else {
+        msg = `小臂水平前方 ${dstr(fYaw)}，IMU 水平前方 ${dstr(iYaw)}。手腕要在小臂上再转约 ${dstr(rel)} 才能让夹爪对准 IMU。`;
+      }
+      document.getElementById("status").innerHTML = msg;
+
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = "#101614";
+      ctx.fillRect(0, 0, w, h);
+
+      const origin = { x: w * 0.38, y: h * 0.58 };
+      ctx.strokeStyle = "#2a3530";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 6]);
+      ctx.beginPath();
+      ctx.moveTo(40, origin.y);
+      ctx.lineTo(w - 40, origin.y);
+      ctx.moveTo(origin.x, 40);
+      ctx.lineTo(origin.x, h - 40);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = "#8aa396";
+      ctx.font = "12px IBM Plex Sans, sans-serif";
+      ctx.fillText("房间 +x（前）", w - 120, origin.y - 10);
+      ctx.fillText("房间 +y", origin.x + 10, 56);
+
+      const armLen = 160;
+      const fx = axisX(R03);
+      const elbow = {
+        x: origin.x + fx.x * armLen,
+        y: origin.y - fx.y * armLen,
+      };
+      ctx.strokeStyle = "#5ee0ff";
+      ctx.lineWidth = 10;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(origin.x, origin.y);
+      ctx.lineTo(elbow.x, elbow.y);
+      ctx.stroke();
+      ctx.fillStyle = "#5ee0ff";
+      ctx.beginPath();
+      ctx.arc(origin.x, origin.y, 8, 0, Math.PI * 2);
+      ctx.fill();
+
+      arrow(elbow, axisX(R03), "#5ee0ff", "小臂前方", 90);
+      arrow(elbow, axisX(Rimu), "#c4f25a", "IMU / 夹爪前方", 90);
+
+      ctx.save();
+      ctx.translate(elbow.x, elbow.y);
+      const a0 = Math.atan2(-fx.y, fx.x);
+      const a1 = Math.atan2(-axisX(Rimu).y, axisX(Rimu).x);
+      ctx.beginPath();
+      ctx.strokeStyle = "#d4b3ff";
+      ctx.lineWidth = 3;
+      ctx.arc(0, 0, 42, a0, a1, rel < 0);
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.fillStyle = "#e8f2ec";
+      ctx.font = "16px IBM Plex Sans, sans-serif";
+      ctx.fillText("俯视：基座在左下交点，末端在小臂尖", 28, 36);
+    }
+
+    Object.values(els).forEach((el) => el.addEventListener("input", render));
+    document.getElementById("demo").addEventListener("click", () => {
+      els.q1.value = 90;
+      els.q2.value = 0;
+      els.q3.value = 0;
+      els.iy.value = 0;
+      els.ip.value = 0;
+      els.ir.value = 0;
+      render();
+    });
+    document.getElementById("lock").addEventListener("click", () => {
+      els.q1.value = 90;
+      els.q2.value = 0;
+      els.q3.value = 0;
+      els.iy.value = 90;
+      els.ip.value = 0;
+      els.ir.value = 0;
+      render();
+    });
+    render();
+  </script>
+</body>
+</html>

@@ -159,5 +159,22 @@
   "part.desc.base": "関節チェーン全体を支持する固定基礎です。",
   "part.desc.link": "関節間で運動と荷重を伝達するリンク部品です。",
   "part.desc.component": "{body} に属する機械部品です。",
-  "part.desc.camera": "30°下向きマウントでエンドエフェクタと共に動く RealSense D405 手首視覚部品です。"
+  "part.desc.camera": "30°下向きマウントでエンドエフェクタと共に動く RealSense D405 手首視覚部品です。",
+  "leader.title": "Leader テレオペ",
+  "leader.on": "Leader を有効化",
+  "leader.off": "Leader を終了",
+  "leader.hint": "3エンコーダが従属アームの J1–J3 を駆動。先端 IMU は自由回転し、J4–J6 が R03ᵀ Rimu を追跡します。",
+  "leader.j1": "エンコーダ J1",
+  "leader.j2": "エンコーダ J2",
+  "leader.j3": "エンコーダ J3",
+  "leader.yaw": "IMU yaw",
+  "leader.pitch": "IMU pitch",
+  "leader.roll": "IMU roll",
+  "leader.holdImu": "腰回転 / IMU 前方",
+  "leader.followArm": "IMU が前腕に追従",
+  "leader.readout": "q4 {q4} · q5 {q5} · q6 {q6} · 姿勢誤差 {err}° · 相対ヨー {rel}",
+  "status.leaderOn": "Leader 有効：エンコーダが J1–J3、IMU がグリッパ方位",
+  "status.leaderOff": "Leader 無効",
+  "status.leaderHold": "前腕は回したが IMU は部屋前方のまま。手首が補償する",
+  "status.leaderFollow": "IMU を前腕姿勢に合わせたので手首はほぼ動かない"
 }

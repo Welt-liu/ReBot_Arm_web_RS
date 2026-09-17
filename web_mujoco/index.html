@@ -44,6 +44,24 @@
           <option value="en">🇬🇧 English</option>
         </select>
       </div>
+      <section class="control-card leader-controls" id="leader-controls" aria-labelledby="leader-title">
+        <div class="control-card-heading">
+          <h2 id="leader-title" data-i18n="leader.title">Leader 遥操作</h2>
+          <button type="button" id="toggle-leader" data-i18n="leader.on">启用 Leader</button>
+        </div>
+        <p class="control-hint" data-i18n="leader.hint">三编码器驱动从臂 J1–J3；末端 IMU 自由转动，从臂 J4–J6 跟踪 R03ᵀ Rimu。</p>
+        <label class="leader-row"><span data-i18n="leader.j1">编码器 J1</span><input type="range" id="leader-j1" min="-2.8" max="2.8" step="0.01" value="0"></label>
+        <label class="leader-row"><span data-i18n="leader.j2">编码器 J2</span><input type="range" id="leader-j2" min="0" max="3.14" step="0.01" value="0"></label>
+        <label class="leader-row"><span data-i18n="leader.j3">编码器 J3</span><input type="range" id="leader-j3" min="0" max="3.14" step="0.01" value="0"></label>
+        <label class="leader-row"><span data-i18n="leader.yaw">IMU yaw</span><input type="range" id="leader-yaw" min="-3.14" max="3.14" step="0.01" value="0"></label>
+        <label class="leader-row"><span data-i18n="leader.pitch">IMU pitch</span><input type="range" id="leader-pitch" min="-1.57" max="1.57" step="0.01" value="0"></label>
+        <label class="leader-row"><span data-i18n="leader.roll">IMU roll</span><input type="range" id="leader-roll" min="-3.14" max="3.14" step="0.01" value="0"></label>
+        <div class="leader-actions">
+          <button type="button" id="leader-hold" data-i18n="leader.holdImu">腰转 / IMU 朝前</button>
+          <button type="button" id="leader-follow" data-i18n="leader.followArm">IMU 跟随小臂</button>
+        </div>
+        <p class="leader-readout" id="leader-readout"></p>
+      </section>
       <section class="control-card camera-controls" aria-labelledby="camera-controls-title">
         <div class="control-card-heading">
           <h2 id="camera-controls-title" data-i18n="camera.title">视觉模式</h2>

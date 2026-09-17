@@ -813,6 +813,36 @@ h1 {
   accent-color: #27d8ff;
 }
 
+.leader-row {
+  display: grid;
+  grid-template-columns: 78px 1fr;
+  gap: 8px;
+  align-items: center;
+  margin: 6px 0;
+  color: #9fd3e6;
+  font-size: 12px;
+}
+
+.leader-row input {
+  width: 100%;
+  accent-color: #c4f25a;
+}
+
+.leader-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.leader-readout {
+  margin: 8px 0 0;
+  color: #d4b3ff;
+  font-size: 12px;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}
+
 .timeline-stage {
   display: flex;
   justify-content: space-between;

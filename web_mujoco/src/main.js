@@ -5,6 +5,7 @@ import { createSceneView } from './scene-view.js';
 import { createJointCallouts } from './ui.js';
 import { createTcpIk } from './tcp-ik.js';
 import { createTcpDrag } from './tcp-drag.js';
+import { createLeaderTeleop } from './leader-teleop.js';
 import { createPartExplorer } from './part-explorer.js';
 import { createGraspDemo } from './grasp-demo.js';
 import { createContactTelemetry } from './contact-telemetry.js';
@@ -47,6 +48,10 @@ const dragMarkerEl = document.getElementById('drag-marker');
 const dragClusterEl = document.getElementById('drag-cluster');
 const gripperOpenEl = document.getElementById('gripper-open');
 const gripperCloseEl = document.getElementById('gripper-close');
+const toggleLeaderEl = document.getElementById('toggle-leader');
+const leaderHoldEl = document.getElementById('leader-hold');
+const leaderFollowEl = document.getElementById('leader-follow');
+const leaderReadoutEl = document.getElementById('leader-readout');
 const viewportEl = document.getElementById('viewport');
 const langSwitchEl = document.getElementById('lang-select');
 const loadingOverlayEl = document.getElementById('loading-overlay');
@@ -178,6 +183,7 @@ setVisualProgress(LOAD_STAGE_PROGRESS['status.booting']);
 
 let panel = null;
 let tcpDrag = null;
+let leaderTeleop = null;
 let partExplorer = null;
 let graspDemo = null;
 let telemetryPanel = null;
@@ -258,6 +264,7 @@ function renderGraspControls() {
   if (graspStageEl) graspStageEl.textContent = t(`grasp.stage.${graspState.stage}`);
   document.body.classList.toggle('grasp-running', graspState.running);
   if (toggleDragEl) toggleDragEl.disabled = graspState.running;
+  if (toggleLeaderEl) toggleLeaderEl.disabled = graspState.running;
   if (gripperOpenEl) gripperOpenEl.disabled = graspState.running;
   if (gripperCloseEl) gripperCloseEl.disabled = graspState.running;
 }
@@ -289,6 +296,7 @@ onLangChange(() => {
   applyStaticI18n();
   panel?.applyLang();
   tcpDrag?.applyLang();
+  leaderTeleop?.applyLang();
   partExplorer?.applyLang();
   renderGuidesToggle();
   renderCameraViewsToggle();
@@ -414,12 +422,14 @@ async function main() {
   startGraspEl?.addEventListener('click', () => {
     if (graspState.running || explosionState.progress > 0) return;
     if (tcpDrag?.isEnabled()) tcpDrag.setEnabled(false);
+    if (leaderTeleop?.isEnabled()) leaderTeleop.setEnabled(false);
     view.clearPartSelection();
     graspDemo.start(selectedVisionTarget);
   });
   startStackEl?.addEventListener('click', () => {
     if (graspState.running || explosionState.progress > 0) return;
     if (tcpDrag?.isEnabled()) tcpDrag.setEnabled(false);
+    if (leaderTeleop?.isEnabled()) leaderTeleop.setEnabled(false);
     view.clearPartSelection();
     graspDemo.startStack();
   });
@@ -436,6 +446,7 @@ async function main() {
   toggleExplosionEl?.addEventListener('click', () => {
     if (cameraViewsVisible) setCameraViewsVisible(false);
     if (tcpDrag?.isEnabled()) tcpDrag.setEnabled(false);
+    if (leaderTeleop?.isEnabled()) leaderTeleop.setEnabled(false);
     view.playExplosion(1);
     panel.closeChips();
     setStatus(t('status.exploding'));
@@ -454,6 +465,7 @@ async function main() {
   explosionProgressEl?.addEventListener('input', () => {
     const progress = Number(explosionProgressEl.value) / 100;
     if (progress > 0 && tcpDrag?.isEnabled()) tcpDrag.setEnabled(false);
+    if (progress > 0 && leaderTeleop?.isEnabled()) leaderTeleop.setEnabled(false);
     if (progress > 0 && cameraViewsVisible) setCameraViewsVisible(false);
     view.setExplosionProgress(progress);
     panel.closeChips();
@@ -489,12 +501,42 @@ async function main() {
     closeEl: gripperCloseEl,
     onStatus: setStatus
   });
+  leaderTeleop = createLeaderTeleop({
+    mujoco,
+    model,
+    data,
+    joints,
+    physics,
+    panel,
+    view,
+    toggleEl: toggleLeaderEl,
+    holdEl: leaderHoldEl,
+    followEl: leaderFollowEl,
+    readoutEl: leaderReadoutEl,
+    sliders: {
+      joint1: document.getElementById('leader-j1'),
+      joint2: document.getElementById('leader-j2'),
+      joint3: document.getElementById('leader-j3'),
+      yaw: document.getElementById('leader-yaw'),
+      pitch: document.getElementById('leader-pitch'),
+      roll: document.getElementById('leader-roll')
+    },
+    onStatus: setStatus,
+    onEnabledChange: (enabled) => {
+      if (enabled && tcpDrag?.isEnabled()) tcpDrag.setEnabled(false);
+    }
+  });
+  toggleDragEl?.addEventListener('click', () => {
+    if (tcpDrag.isEnabled() && leaderTeleop?.isEnabled()) leaderTeleop.setEnabled(false);
+  });
 
   view.render();
   panel.layout(view.projectWorld, data);
 
   resetEl.addEventListener('click', () => {
     tcpDrag.stop();
+    leaderTeleop.setEnabled(false);
+    leaderTeleop.syncFromFollower();
     graspDemo.reset();
     telemetryPanel.reset();
     view.resetExplosion();
@@ -514,6 +556,9 @@ async function main() {
 
   let lastTelemetryAt = -Infinity;
   const loop = () => {
+    if (leaderTeleop.isEnabled() && !graspDemo.isRunning()) {
+      leaderTeleop.update(performance.now());
+    }
     graspDemo.update();
     physics.step(graspDemo.isRunning() ? 12 : STEPS_PER_FRAME);
     const angles = readAngles(data, joints);
