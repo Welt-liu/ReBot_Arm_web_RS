@@ -6,6 +6,7 @@
   "description": "Mac-local MuJoCo WASM physics demo for B601-RS",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5173",
+    "imu": "python scripts/imu_bridge.py",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1 --port 5173",
     "smoke": "node scripts/smoke-load.mjs",

@@ -144,6 +144,12 @@ export default defineConfig({
     strictPort: false,
     headers: {
       'Cache-Control': 'no-cache, no-store, must-revalidate'
+    },
+    proxy: {
+      '/imu-bridge': {
+        target: 'http://127.0.0.1:8768',
+        rewrite: (pathName) => pathName.replace(/^\/imu-bridge/, '')
+      }
     }
   }
 });

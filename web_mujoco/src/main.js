@@ -6,6 +6,7 @@ import { createJointCallouts } from './ui.js';
 import { createTcpIk } from './tcp-ik.js';
 import { createTcpDrag } from './tcp-drag.js';
 import { createLeaderTeleop } from './leader-teleop.js';
+import { createImuClient } from './imu-client.js';
 import { createPartExplorer } from './part-explorer.js';
 import { createGraspDemo } from './grasp-demo.js';
 import { createContactTelemetry } from './contact-telemetry.js';
@@ -52,6 +53,9 @@ const toggleLeaderEl = document.getElementById('toggle-leader');
 const leaderHoldEl = document.getElementById('leader-hold');
 const leaderFollowEl = document.getElementById('leader-follow');
 const leaderReadoutEl = document.getElementById('leader-readout');
+const toggleImuEl = document.getElementById('toggle-imu');
+const zeroImuEl = document.getElementById('zero-imu');
+const imuStatusEl = document.getElementById('imu-status');
 const viewportEl = document.getElementById('viewport');
 const langSwitchEl = document.getElementById('lang-select');
 const loadingOverlayEl = document.getElementById('loading-overlay');
@@ -184,6 +188,8 @@ setVisualProgress(LOAD_STAGE_PROGRESS['status.booting']);
 let panel = null;
 let tcpDrag = null;
 let leaderTeleop = null;
+let imuClient = null;
+let lastImuStatus = null;
 let partExplorer = null;
 let graspDemo = null;
 let telemetryPanel = null;
@@ -292,6 +298,39 @@ function renderExplosionControls() {
   reverseExplosionEl.setAttribute('aria-pressed', String(explosionState.direction < 0));
 }
 
+function renderImuStatus() {
+  if (!imuStatusEl) return;
+  if (!imuClient?.isRunning()) {
+    imuStatusEl.textContent = '';
+    return;
+  }
+  const sample = lastImuStatus;
+  if (!sample) {
+    imuStatusEl.textContent = t('leader.imuWaiting');
+    return;
+  }
+  if (sample.ok) {
+    imuStatusEl.textContent = t('leader.imuLive', {
+      hz: sample.hz ?? 0,
+      roll: Number(sample.roll).toFixed(1),
+      pitch: Number(sample.pitch).toFixed(1),
+      yaw: Number(sample.yaw).toFixed(1)
+    });
+    return;
+  }
+  imuStatusEl.textContent = t('leader.imuError', {
+    error: sample.error || t('leader.imuWaiting')
+  });
+}
+
+function renderImuControls() {
+  const running = Boolean(imuClient?.isRunning());
+  toggleImuEl?.classList.toggle('active', running);
+  if (toggleImuEl) toggleImuEl.textContent = t(running ? 'leader.imuOff' : 'leader.imuOn');
+  if (zeroImuEl) zeroImuEl.textContent = t('leader.imuZero');
+  renderImuStatus();
+}
+
 onLangChange(() => {
   applyStaticI18n();
   panel?.applyLang();
@@ -305,6 +344,7 @@ onLangChange(() => {
   renderGraspControls();
   renderContactVisualsToggle();
   renderExplosionControls();
+  renderImuControls();
   if (!loadingComplete) {
     renderLoadProgress();
   } else if (explosionState.direction > 0) {
@@ -526,6 +566,27 @@ async function main() {
       if (enabled && tcpDrag?.isEnabled()) tcpDrag.setEnabled(false);
     }
   });
+  imuClient = createImuClient({
+    onSample: (sample) => leaderTeleop.applyImuDegrees(sample),
+    onStatus: (sample) => {
+      lastImuStatus = sample;
+      renderImuStatus();
+    }
+  });
+  toggleImuEl?.addEventListener('click', () => {
+    if (imuClient.isRunning()) {
+      imuClient.stop();
+      lastImuStatus = null;
+    } else {
+      imuClient.start();
+    }
+    renderImuControls();
+  });
+  zeroImuEl?.addEventListener('click', () => {
+    leaderTeleop.zeroImu();
+    setStatus(t('leader.imuZero'));
+  });
+  renderImuControls();
   toggleDragEl?.addEventListener('click', () => {
     if (tcpDrag.isEnabled() && leaderTeleop?.isEnabled()) leaderTeleop.setEnabled(false);
   });
@@ -535,6 +596,9 @@ async function main() {
 
   resetEl.addEventListener('click', () => {
     tcpDrag.stop();
+    imuClient?.stop();
+    lastImuStatus = null;
+    renderImuControls();
     leaderTeleop.setEnabled(false);
     leaderTeleop.syncFromFollower();
     graspDemo.reset();

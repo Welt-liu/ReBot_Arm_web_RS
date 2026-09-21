@@ -222,6 +222,11 @@ export function createLeaderTeleop({
 
   const imuEuler = new THREE.Euler(0, 0, 0, 'ZYX');
   const imuMatrix = new THREE.Matrix4();
+  const imuNowQ = new THREE.Quaternion();
+  const imuCmdQ = new THREE.Quaternion();
+  let imuRefQ = null;
+  let gripRefQ = null;
+  let imuLive = false;
   const gripMatrix = new THREE.Matrix4();
   const forearmMatrix = new THREE.Matrix4();
   const worldX = new THREE.Vector3();
@@ -274,6 +279,31 @@ export function createLeaderTeleop({
       const joint = joints.byName[name];
       wristAngles[name] = physics.targets[name] ?? data.qpos[joint.qposadr];
     });
+  }
+
+  function applyImuDegrees(sample) {
+    if (!enabled) setEnabled(true);
+    const roll = -Number(sample.roll) * Math.PI / 180;
+    const pitch = Number(sample.pitch) * Math.PI / 180;
+    const yaw = Number(sample.yaw) * Math.PI / 180;
+    if (![roll, pitch, yaw].every(Number.isFinite)) return;
+    imuNowQ.setFromEuler(new THREE.Euler(roll, pitch, yaw, 'ZYX'));
+    if (!imuRefQ) {
+      imuRefQ = imuNowQ.clone();
+      gripRefQ = new THREE.Quaternion().setFromEuler(imuEuler);
+    }
+    imuCmdQ.copy(gripRefQ).multiply(imuRefQ.clone().conjugate()).multiply(imuNowQ);
+    imuEuler.setFromQuaternion(imuCmdQ, 'ZYX');
+    imuMatrix.makeRotationFromEuler(imuEuler);
+    sliders.roll.value = String(imuEuler.x);
+    sliders.pitch.value = String(imuEuler.y);
+    sliders.yaw.value = String(imuEuler.z);
+    imuLive = true;
+  }
+
+  function zeroImu() {
+    imuRefQ = null;
+    gripRefQ = null;
   }
 
   function writeImuFromMatrix(matrix) {
@@ -441,9 +471,12 @@ export function createLeaderTeleop({
     applyLang();
     if (enabled) {
       syncFromFollower();
+      zeroImu();
       lastTime = performance.now();
       onStatus(t('status.leaderOn'));
     } else {
+      zeroImu();
+      imuLive = false;
       onStatus(t('status.leaderOff'));
     }
     onEnabledChange?.(enabled);
@@ -504,6 +537,8 @@ export function createLeaderTeleop({
     update,
     setEnabled,
     syncFromFollower,
+    applyImuDegrees,
+    zeroImu,
     applyLang,
     isEnabled() {
       return enabled;
