@@ -79,6 +79,7 @@ class JointStatePublisher:
         period = 1.0 / max(float(rate_hz), 1.0)
         self._feedback_poll_period = 1.0 / max(float(feedback_poll_rate_hz), 1.0)
         self._last_feedback_poll = 0.0
+        self._feedback_stamp = None
         self._timer = node.create_timer(
             period,
             self.publish,
@@ -101,6 +102,8 @@ class JointStatePublisher:
 
         msg = JointState()
         msg.header.stamp = self._node.get_clock().now().to_msg()
+        if request_feedback:
+            self._feedback_stamp = msg.header.stamp
         status_codes = self._hardware.get_joint_status_codes()
         for i, name in enumerate(self._hardware.joint_names):
             motor_msg = JointMotorState()
@@ -162,7 +165,11 @@ class JointStatePublisher:
             msg.effort.extend([float(g_torque), float(g_torque)])
 
             gripper_msg = JointMotorState()
-            gripper_msg.header = msg.header
+            # Preserve the measurement time when display publication is faster
+            # than CAN polling. Force feedback must not treat cache replays as
+            # new measurements.
+            if self._feedback_stamp is not None:
+                gripper_msg.header.stamp = self._feedback_stamp
             gripper_msg.joint_name = "gripper"
             gripper_msg.position = float(g_pos)
             gripper_msg.velocity = float(g_vel)

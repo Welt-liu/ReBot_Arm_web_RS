@@ -1,0 +1,188 @@
+[
+  {
+    "key": "force_gain",
+    "default": 3.5,
+    "min": 0,
+    "max": 10,
+    "step": 0.1,
+    "group": "basic"
+  },
+  {
+    "key": "angle_scale",
+    "default": 0.5,
+    "min": 0.05,
+    "max": 2,
+    "step": 0.05,
+    "group": "basic"
+  },
+  {
+    "key": "max_raw",
+    "default": 150,
+    "min": 0,
+    "max": 150,
+    "step": 1,
+    "group": "basic"
+  },
+  {
+    "key": "stiffness",
+    "default": 8,
+    "min": 0,
+    "max": 50,
+    "step": 0.5,
+    "group": "basic"
+  },
+  {
+    "key": "damping",
+    "default": 0.8,
+    "min": 0,
+    "max": 5,
+    "step": 0.1,
+    "group": "basic"
+  },
+  {
+    "key": "full_scale_n",
+    "default": 20,
+    "min": 1,
+    "max": 1000,
+    "step": 1,
+    "group": "basic"
+  },
+  {
+    "key": "resistance_speed",
+    "default": 2,
+    "min": 1,
+    "max": 10,
+    "step": 1,
+    "group": "basic"
+  },
+  {
+    "key": "force_deadband_n",
+    "default": 0.5,
+    "min": 0,
+    "max": 10,
+    "step": 0.05,
+    "group": "advanced"
+  },
+  {
+    "key": "contact_on_n",
+    "default": 0.3,
+    "min": 0.02,
+    "max": 10,
+    "step": 0.01,
+    "group": "advanced"
+  },
+  {
+    "key": "contact_off_n",
+    "default": 0.15,
+    "min": 0,
+    "max": 9.95,
+    "step": 0.05,
+    "group": "advanced"
+  },
+  {
+    "key": "grip_confirm_ms",
+    "default": 100,
+    "min": 20,
+    "max": 1000,
+    "step": 10,
+    "group": "advanced"
+  },
+  {
+    "key": "touch_cap_raw",
+    "default": 45,
+    "min": 0,
+    "max": 150,
+    "step": 1,
+    "group": "advanced"
+  },
+  {
+    "key": "wall_deadband_mm",
+    "default": 0.2,
+    "min": 0,
+    "max": 5,
+    "step": 0.05,
+    "group": "advanced"
+  },
+  {
+    "key": "opening_fraction",
+    "default": 0,
+    "min": 0,
+    "max": 1,
+    "step": 0.05,
+    "group": "advanced",
+    "hidden": true
+  },
+  {
+    "key": "slip_distance_mm",
+    "default": 3,
+    "min": 0.5,
+    "max": 20,
+    "step": 0.5,
+    "group": "advanced"
+  },
+  {
+    "key": "slip_confirm_ms",
+    "default": 60,
+    "min": 20,
+    "max": 500,
+    "step": 10,
+    "group": "advanced"
+  },
+  {
+    "key": "slip_hold_ms",
+    "default": 200,
+    "min": 80,
+    "max": 1000,
+    "step": 20,
+    "group": "advanced"
+  },
+  {
+    "key": "slip_pulse_raw",
+    "default": 0,
+    "min": 0,
+    "max": 40,
+    "step": 1,
+    "group": "advanced",
+    "hidden": true
+  },
+  {
+    "key": "smoothing_ms",
+    "default": 30,
+    "min": 0,
+    "max": 200,
+    "step": 5,
+    "group": "advanced"
+  },
+  {
+    "key": "slew_raw_s",
+    "default": 600,
+    "min": 50,
+    "max": 3000,
+    "step": 50,
+    "group": "advanced"
+  },
+  {
+    "key": "wall_hold_raw",
+    "default": 35,
+    "min": 0,
+    "max": 150,
+    "step": 1,
+    "group": "basic"
+  },
+  {
+    "key": "release_angle_deg",
+    "default": 0.35,
+    "min": 0.1,
+    "max": 3,
+    "step": 0.05,
+    "group": "basic"
+  },
+  {
+    "key": "rearm_angle_deg",
+    "default": 0.35,
+    "min": 0.1,
+    "max": 3,
+    "step": 0.05,
+    "group": "advanced"
+  }
+]

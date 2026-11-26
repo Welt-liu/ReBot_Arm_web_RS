@@ -12,6 +12,7 @@ import { createTelemetryPanel } from './telemetry-panel.js';
 import { OBJECT_MOVE_STEP, createObjectPositionController } from './object-position-control.js';
 import { t, bindLangSwitch, applyStaticI18n, onLangChange } from './i18n.js';
 import { persistAppShell } from './register-service-worker.js';
+import { createForceFeedback } from './force-feedback.js';
 
 const statusEl = document.getElementById('status');
 const calloutsEl = document.getElementById('callouts');
@@ -203,6 +204,7 @@ let overheadCameraCollapsed = false;
 let wristCameraCollapsed = false;
 let selectedVisionTarget = 'red';
 let contactVisualsEnabled = true;
+let servoGripperControlActive = false;
 let graspState = { running: false, stage: 'idle', progress: 0, message: '' };
 let objectControlState = {
   enabled: false,
@@ -265,16 +267,16 @@ function renderGraspControls() {
     button.setAttribute('aria-pressed', String(active));
     button.disabled = graspState.running;
   });
-  if (startGraspEl) startGraspEl.disabled = graspState.running || objectControlState.enabled || explosionState.progress > 0;
-  if (startStackEl) startStackEl.disabled = graspState.running || objectControlState.enabled || explosionState.progress > 0;
+  if (startGraspEl) startGraspEl.disabled = graspState.running || objectControlState.enabled || explosionState.progress > 0 || servoGripperControlActive;
+  if (startStackEl) startStackEl.disabled = graspState.running || objectControlState.enabled || explosionState.progress > 0 || servoGripperControlActive;
   if (cancelGraspEl) cancelGraspEl.disabled = !graspState.running;
   if (graspProgressEl) graspProgressEl.value = graspState.progress || 0;
   if (graspProgressValueEl) graspProgressValueEl.textContent = `${Math.round((graspState.progress || 0) * 100)}%`;
   if (graspStageEl) graspStageEl.textContent = t(`grasp.stage.${graspState.stage}`);
   document.body.classList.toggle('grasp-running', graspState.running);
   if (toggleDragEl) toggleDragEl.disabled = graspState.running || objectControlState.enabled;
-  if (gripperOpenEl) gripperOpenEl.disabled = graspState.running || objectControlState.enabled;
-  if (gripperCloseEl) gripperCloseEl.disabled = graspState.running || objectControlState.enabled;
+  if (gripperOpenEl) gripperOpenEl.disabled = graspState.running || objectControlState.enabled || servoGripperControlActive;
+  if (gripperCloseEl) gripperCloseEl.disabled = graspState.running || objectControlState.enabled || servoGripperControlActive;
 }
 
 function renderObjectControls() {
@@ -365,6 +367,24 @@ async function main() {
   const physics = createPhysicsController(mujoco, model, data, joints);
   const ik = createTcpIk(mujoco, model, data, joints);
   const contactTelemetry = createContactTelemetry(mujoco, model, data);
+  const forceFeedback = createForceFeedback(document.getElementById('force-feedback'), {
+    onGripperTarget: (width) => {
+      physics.setTarget('joint7', width);
+      panel?.setTarget('joint7', width);
+    },
+    onGripperControl: (active) => {
+      if (active === servoGripperControlActive) return;
+      if (active && graspDemo?.isRunning()) graspDemo.cancel();
+      if (!active) {
+        const position = data.qpos[joints.byName.joint7.qposadr];
+        physics.setTarget('joint7', position);
+        panel?.setTarget('joint7', position);
+      }
+      servoGripperControlActive = active;
+      panel?.setGripperLocked(active);
+      renderGraspControls();
+    }
+  });
 
   objectPositionController = createObjectPositionController({
     mujoco,
@@ -398,6 +418,7 @@ async function main() {
   }
 
   panel = createJointCallouts(calloutsEl, joints, (name, value) => {
+    if (name === 'joint7' && servoGripperControlActive) return;
     physics.setTarget(name, value);
   });
   panel.setGuidesVisible(guidesVisible);
@@ -649,6 +670,7 @@ async function main() {
   panel.layout(view.projectWorld, data);
 
   resetEl.addEventListener('click', () => {
+    forceFeedback.reset();
     tcpDrag.stop();
     graspDemo.reset();
     telemetryPanel.reset();
@@ -669,8 +691,11 @@ async function main() {
   finishLoading();
 
   let lastTelemetryAt = -Infinity;
+  let lastFeedbackAt = -Infinity;
+  let contacts;
   const loop = () => {
     graspDemo.update();
+    forceFeedback.updateGripper();
     physics.step(graspDemo.isRunning() ? 12 : STEPS_PER_FRAME);
     const angles = readAngles(data, joints);
     Object.entries(angles).forEach(([name, amount]) => panel.setActual(name, amount));
@@ -680,10 +705,16 @@ async function main() {
     view.sync(data);
     tcpDrag.update(performance.now());
     const now = performance.now();
+    if (now - lastFeedbackAt >= 20) {
+      contacts = contactTelemetry.sample(selectedVisionTarget);
+      const gripper = physics.telemetry().joints.find(joint => joint.name === 'joint7');
+      forceFeedback.sample({ force_n: contacts.gripperForce, grip_contacts: contacts.gripContacts,
+        actual_width_mm: gripper.position * 1000, target_width_mm: gripper.target * 1000 });
+      lastFeedbackAt = now;
+    }
     if (now - lastTelemetryAt >= 80) {
       objectControlState = objectPositionController.state();
       renderObjectControls();
-      const contacts = contactTelemetry.sample(selectedVisionTarget);
       view.setContactVisuals(contacts.contacts, contactVisualsEnabled);
       telemetryPanel.update(physics.telemetry(), contacts);
       lastTelemetryAt = now;

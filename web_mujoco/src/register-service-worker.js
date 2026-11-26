@@ -21,7 +21,7 @@ export async function persistAppShell() {
   performance.getEntriesByType('resource').forEach((entry) => {
     const url = new URL(entry.name);
     if (url.origin !== scopeUrl.origin || !url.pathname.startsWith(scopeUrl.pathname)) return;
-    if (!url.pathname.includes('/models/')) urls.add(url.href);
+    if (!url.pathname.includes('/models/') && !url.pathname.includes('/feetech/')) urls.add(url.href);
   });
   registration.active.postMessage({ type: 'CACHE_APP_SHELL', urls: [...urls] });
 }

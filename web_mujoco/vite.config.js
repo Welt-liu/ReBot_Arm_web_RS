@@ -140,6 +140,7 @@ export default defineConfig({
     }
   ],
   server: {
+    proxy: { '/feetech': { target: 'http://127.0.0.1:8766' } },
     port: 5173,
     strictPort: false,
     headers: {

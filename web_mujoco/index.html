@@ -144,6 +144,46 @@
           </div>
         </div>
       </section>
+      <section class="control-card feedback-controls" id="force-feedback" aria-labelledby="feedback-title">
+        <div class="control-card-heading">
+          <h2 id="feedback-title" data-i18n="feedback.title">飞特力反馈</h2>
+          <button type="button" id="feedback-connect" aria-pressed="false" disabled data-i18n="feedback.connect">连接舵机</button>
+        </div>
+        <div class="feedback-port-row">
+          <label for="feedback-port" data-i18n="feedback.port">舵机串口</label>
+          <select id="feedback-port" disabled><option value="" data-i18n="feedback.portPlaceholder">请选择串口</option></select>
+          <button type="button" id="feedback-refresh-ports" data-i18n="feedback.refreshPorts">刷新端口</button>
+        </div>
+        <p id="feedback-port-status" class="control-hint" role="status"></p>
+        <p id="feedback-angle-error" class="control-hint is-error" role="alert" hidden></p>
+        <p class="control-hint" data-i18n="feedback.hint">单向挡墙：合拢顶住，张开立即卸力；电流上限 150。</p>
+        <div class="feedback-metrics">
+          <div><span data-i18n="feedback.force">夹爪接触力</span><strong id="feedback-force">0.0 N</strong></div>
+          <div><span data-i18n="feedback.raw">舵机输出</span><strong id="feedback-raw">0 / 150</strong></div>
+          <div><span data-i18n="feedback.angle">舵机角度</span><strong id="feedback-angle">—</strong></div>
+          <div><span data-i18n="feedback.width">夹爪目标开度</span><strong id="feedback-width">—</strong></div>
+        </div>
+        <label class="feedback-scale"><span><input id="feedback-angle-control" type="checkbox" checked> <span data-i18n="feedback.angleControl">角度控制夹爪 · 1° = 0.5 mm</span></span></label>
+        <div class="feedback-angle-actions">
+          <button type="button" id="feedback-zero" disabled data-i18n="feedback.zero">当前位置设为 50 mm</button>
+          <label><input id="feedback-reverse" type="checkbox"> <span data-i18n="feedback.reverse">反转方向</span></label>
+        </div>
+        <p class="control-hint" data-i18n="feedback.angleHint">连接时当前位置为 50 mm；0 mm 和 50 mm 两端均为单向挡墙，反向可自由退回。关闭角度控制可使用自动抓取。</p>
+        <div class="feedback-metrics">
+          <div><span data-i18n="feedback.gripState">夹持状态</span><strong id="feedback-grip-state">空载</strong></div>
+          <div><span data-i18n="feedback.fingers">左 / 右指接触力</span><strong id="feedback-fingers">0 / 0 N</strong></div>
+          <div><span data-i18n="feedback.wall">弹簧压入量</span><strong id="feedback-wall">0 mm</strong></div>
+          <div><span data-i18n="feedback.wallAngle">挡墙角度</span><strong id="feedback-wall-angle">—</strong></div>
+          <div><span data-i18n="feedback.wallStatus">挡墙状态</span><strong id="feedback-wall-status">自由</strong></div>
+          <div><span data-i18n="feedback.parts">接触 / 弹簧 / 阻尼</span><strong id="feedback-parts">0 / 0 / 0</strong></div>
+        </div>
+        <div id="feedback-basic" class="feedback-settings"></div>
+        <details class="feedback-advanced"><summary data-i18n="feedback.advanced">高级参数</summary><div id="feedback-advanced" class="feedback-settings"></div></details>
+        <button type="button" id="feedback-defaults" data-i18n="feedback.defaults">恢复默认参数</button>
+        <p id="feedback-settings-status" class="control-hint" role="status"></p>
+        <button type="button" id="feedback-test" disabled data-i18n="feedback.test">按住测试 · 输出 10</button>
+        <p id="feedback-status" class="control-hint" role="status" data-i18n="feedback.disconnected">未连接本地串口桥</p>
+      </section>
       <section class="control-card telemetry-controls" id="telemetry-controls" aria-labelledby="telemetry-title">
         <div class="control-card-heading">
           <h2 id="telemetry-title" data-i18n="telemetry.title">接触与受力</h2>

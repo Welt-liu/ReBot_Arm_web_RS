@@ -1,11 +1,13 @@
 import { ARM_JOINTS, homePose } from './kinematics.js';
 
-/** Gains and limits copied from rebotarm_mujoco_rs/mujoco_sync.py. */
+/** Arm gains and limits copied from rebotarm_mujoco_rs/mujoco_sync.py. */
 export const ARM_KP = [80, 100, 100, 35, 25, 18];
 export const ARM_KD = [8, 10, 10, 4, 3, 2.5];
 export const ARM_TAU_LIMIT = [36, 36, 36, 14, 14, 14];
-export const GRIPPER_KP = 300;
-export const GRIPPER_KD = 40;
+// Fast physical jaw response, including manual and servo-driven targets.
+// The force cap and MuJoCo collision constraints still stop a blocked gripper.
+export const GRIPPER_KP = 1800;
+export const GRIPPER_KD = 18;
 export const GRIPPER_TAU_LIMIT = 150;
 
 /** Display ~60 Hz with 4 physics steps (timestep 0.001 → ~240 Hz). */

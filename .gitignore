@@ -12,3 +12,4 @@ reBotArm_simulator-RS/.env
 web_mujoco/node_modules/
 web_mujoco/dist/
 .vite/
+.deps/

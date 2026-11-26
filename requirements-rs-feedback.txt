@@ -1,0 +1,2 @@
+# The official HLS SDK is fetched at a fixed revision by setup_rs_feedback.sh.
+pyserial==3.5

@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import loadMujoco from '@mujoco/mujoco';
@@ -7,6 +7,8 @@ import { createPhysicsController } from '../src/pd-control.js';
 import { createTcpIk } from '../src/tcp-ik.js';
 import { createGraspDemo, STORAGE_ZONES, STACK_TARGETS } from '../src/grasp-demo.js';
 import { OBJECT_MOVE_STEP, createObjectPositionController } from '../src/object-position-control.js';
+import { createContactTelemetry } from '../src/contact-telemetry.js';
+import { gripperTargetFromStatus } from '../src/force-feedback-client.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const modelsDir = path.resolve(here, '../../rebotarm_ros2_RS/src/rebotarm_mujoco_rs/models');
@@ -225,6 +227,9 @@ async function main() {
   }
   contactForceBuffer.delete();
   assert(maxContactForce > 0.01, `接触力应为正值：${maxContactForce}`);
+  const hapticReplay = {};
+  const contactTelemetry = createContactTelemetry(mujoco, model, data);
+  assert(contactTelemetry.sample().activeContacts > 0, '网页接触力采样必须读到 WASM 缓冲区的真实值');
   assert(
     cubeSettled[2] > 0.09 && cubeSettled[2] < 0.16,
     `红块应停在桌面上，z=${cubeSettled[2]}`
@@ -248,7 +253,12 @@ async function main() {
   assert(wristCameraTravel > 0.01, `腕部相机没有随机械臂运动：${wristCameraTravel}`);
 
   physics.reset();
-  physics.setTarget('joint7', 0.03);
+  const servoTarget = gripperTargetFromStatus({
+    connected: true, angle_control: true, angle_age_s: 0,
+    gripper_mm: 30 // Measured 60° from the software zero -> 30 mm.
+  });
+  assert(servoTarget === 0.03, '舵机 60° 应映射为 30 mm 夹爪目标');
+  physics.setTarget('joint7', servoTarget);
   physics.step(400);
   const gripper = data.qpos[joints.byName.joint7.qposadr];
   assert(Math.abs(gripper - 0.03) < 0.008, `夹爪应变到 30 mm 附近，q=${gripper}`);
@@ -277,13 +287,30 @@ async function main() {
       onChange: (state) => { graspState = state; }
     });
     const zone = STORAGE_ZONES[target];
+    let peakGripperForce = 0;
+    let peakPairedForce = 0;
+    const hapticFrames = [];
     graspDemo.start(target);
     for (let frame = 0; frame < 3200 && graspDemo.isRunning(); frame += 1) {
       graspDemo.update();
       physics.step(graspPhysicsSteps);
+      const feedback = contactTelemetry.sample(target);
+      peakGripperForce = Math.max(peakGripperForce, feedback.gripperForce);
+      peakPairedForce = Math.max(peakPairedForce, ...feedback.gripContacts.map(c => Math.min(c.left_n, c.right_n)));
+      assert(feedback.gripContacts.every(c => c.relative_mm.every(Number.isFinite)), '夹爪相对坐标必须有效');
+      assert(Math.abs(feedback.gripperForce - feedback.gripContacts.reduce((sum, c) => sum + c.left_n + c.right_n, 0)) < 1e-8,
+        '左右指接触力总和必须与反馈力相同');
+      if (process.env.HAPTIC_REPLAY) {
+        const gripper = physics.telemetry().joints.find(j => j.name === 'joint7');
+        hapticFrames.push({ now: frame / 60, force_n: feedback.gripperForce, contacts: feedback.gripContacts,
+          actual_mm: gripper.position * 1000, target_mm: gripper.target * 1000 });
+      }
     }
+    hapticReplay[target] = hapticFrames;
+    assert(peakPairedForce > 0.3, `${target} 应读到同一物体的双侧接触`);
     graspState = graspDemo.state();
     const finalPosition = bodyPos(mujoco, model, data, body);
+    assert(peakGripperForce > 0.5, `${target} 夹取应产生可用于力反馈的接触力，got=${peakGripperForce}`);
     assert(
       graspState.stage === 'complete',
       `${target} 一键抓取未完成：${graspState.stage}/${graspState.message}`
@@ -301,11 +328,14 @@ async function main() {
     );
     graspResults[target] = {
       stage: graspState.stage,
+      peakGripperForce,
+      peakPairedForce,
       position: finalPosition,
       carryOffset: graspState.carryOffset
     };
   }
 
+  if (process.env.HAPTIC_REPLAY) await writeFile(process.env.HAPTIC_REPLAY, JSON.stringify(hapticReplay));
   physics.reset();
   const browserObserver = { x: 0.85, y: -0.95, z: 0.62 };
   const stackOffsets = {};

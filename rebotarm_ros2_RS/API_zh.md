@@ -23,6 +23,8 @@
 | Topic | `/rebot_arm_rs/arm_status` | `rebotarm_msgs/msg/ArmStatus` | controller 状态机和健康状态 |
 | Topic | `/rebot_arm_rs/joints/<joint>/state` | `rebotarm_msgs/msg/JointMotorState` | 单关节电机状态 |
 | Topic | `/rebot_arm_rs/gripper/state` | `rebotarm_msgs/msg/JointMotorState` | 夹爪电机状态 |
+| Topic（可选节点） | `/rebot_arm_rs/gripper/feedback_raw` | `std_msgs/msg/UInt16` | HLS3604M 力反馈目标原始值 0–100 |
+| Service（可选节点） | `/rebot_arm_rs/gripper/feedback_enable` | `std_srvs/srv/SetBool` | 开关 HLS3604M 夹爪力反馈 |
 | Service | `/rebot_arm_rs/enable` | `std_srvs/srv/Trigger` | 使能机械臂 |
 | Service | `/rebot_arm_rs/disable` | `std_srvs/srv/Trigger` | 失能机械臂 |
 | Service | `/rebot_arm_rs/safe_home` | `std_srvs/srv/Trigger` | 安全回零 |

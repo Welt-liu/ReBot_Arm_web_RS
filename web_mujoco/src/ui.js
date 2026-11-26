@@ -242,6 +242,9 @@ export function createJointCallouts(root, joints, onChange) {
 
   return {
     layout,
+    setGripperLocked(locked) {
+      if (chips.joint7) chips.joint7.slider.disabled = Boolean(locked);
+    },
     closeChips: closeOpenChips,
     setGuidesVisible(visible) {
       showAllGuides = Boolean(visible);

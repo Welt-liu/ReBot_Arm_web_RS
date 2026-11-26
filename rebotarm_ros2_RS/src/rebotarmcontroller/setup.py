@@ -6,6 +6,7 @@ setup(
     name=package_name,
     version="0.3.0",
     packages=find_packages(exclude=["test"]),
+    package_data={package_name: ["haptic_settings.json"]},
     data_files=[
         ("share/ament_index/resource_index/packages", [f"resource/{package_name}"]),
         (f"share/{package_name}", ["package.xml"]),
@@ -21,6 +22,7 @@ setup(
         "console_scripts": [
             "reBotArmController = rebotarmcontroller.rebotarm_controller:main",
             "FakeRsDriver = rebotarmcontroller.fake_rs_driver:main",
+            "FeetechGripperFeedback = rebotarmcontroller.feetech_feedback_node:main",
             "GravityCompensation = rebotarmcontroller.examples.gravity_compensation:main",
             "GripperControl = rebotarmcontroller.examples.gripper_control:main",
             "MoveTo = rebotarmcontroller.examples.move_to:main",
